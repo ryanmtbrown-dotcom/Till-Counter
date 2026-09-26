@@ -1,40 +1,134 @@
-name: Build Till Counter APK
+name: Prove and Release Till Counter APK
+
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
-  build:
+  prove-and-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
-      - name: Check out project
-        uses: actions/checkout@v4
+      - name: Check out exact source
+        uses: actions/checkout@v5
+
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.13'
+
+      - name: Validate source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/java/com/tillcounter/app/MainActivity.java
+          test ! -e app/src/main/java/com/tillcounter/app/MainActivity.kt
+          test -s app/src/main/assets/index.html
+          test -s app/src/main/assets/app.js
+          test -s app/src/main/assets/app.css
+          test -s app/src/main/assets/splash.png
+          test -s app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          grep -q 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
+          grep -q 'file:///android_asset/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
+          grep -q 'versionName = "0.1.2"' app/build.gradle.kts
+
       - name: Build debug APK
         run: gradle --stacktrace :app:assembleDebug
-      - name: Collect build diagnostics
-        if: failure()
+
+      - name: Verify APK package contents
+        shell: bash
         run: |
-          mkdir -p build-diagnostics
-          find . -type f \( -name '*.log' -o -name '*.txt' -o -name '*.html' \) -path '*/build/*' -print -exec cp --parents {} build-diagnostics/ \; || true
-      - name: Upload diagnostics on failure
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | tee apk-contents.txt
+          grep -q 'assets/index.html' apk-contents.txt
+          grep -q 'assets/app.js' apk-contents.txt
+          grep -q 'assets/app.css' apk-contents.txt
+          grep -q 'assets/splash.png' apk-contents.txt
+          # classes.dex must exist; MainActivity presence is then proven at runtime by the emulator launch below.
+          grep -q 'classes.dex' apk-contents.txt
+          sha256sum "$APK" | tee apk-build.sha256
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install APK and prove real Android startup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          script: ./scripts/ci-device-smoke.sh
+
+      - name: Stage proven APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk release/Till-Counter-v0.1.2.apk
+          sha256sum release/Till-Counter-v0.1.2.apk | tee release/Till-Counter-v0.1.2.apk.sha256
+
+      - name: Upload proof bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Till-Counter-v0.1.2-Proof
+          path: |
+            release/Till-Counter-v0.1.2.apk
+            release/Till-Counter-v0.1.2.apk.sha256
+            apk-contents.txt
+            apk-build.sha256
+            device-smoke-logcat.txt
+            device-smoke.png
+          if-no-files-found: error
+
+      - name: Publish release only after all proof gates pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=v0.1.2
+          APK=release/Till-Counter-v0.1.2.apk
+          SUM=release/Till-Counter-v0.1.2.apk.sha256
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$SUM" --clobber
+          else
+            gh release create "$TAG" "$APK" "$SUM" --target "$GITHUB_SHA" --title 'Till Counter v0.1.2' --notes 'Release published only after build, APK-content verification, installation on an Android 15 emulator, successful MainActivity launch, eight-second survival beyond the six-second splash, resumed-activity verification, and fatal-runtime-log checks passed.'
+          fi
+          gh release download "$TAG" --pattern 'Till-Counter-v0.1.2.apk' --dir release-verify
+          test -s release-verify/Till-Counter-v0.1.2.apk
+          cmp "$APK" release-verify/Till-Counter-v0.1.2.apk
+          echo 'RELEASE_ROUNDTRIP_PASS'
+
+      - name: Collect diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          cp -f device-smoke-logcat.txt diagnostics/ 2>/dev/null || true
+          cp -f device-smoke.png diagnostics/ 2>/dev/null || true
+          cp -f apk-contents.txt diagnostics/ 2>/dev/null || true
+          find app/build -type f \( -name '*.log' -o -name '*.txt' -o -name '*.html' \) -exec cp --parents {} diagnostics/ \; 2>/dev/null || true
+
+      - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: Till-Counter-Build-Diagnostics
-          path: build-diagnostics
+          name: Till-Counter-v0.1.2-Failure-Diagnostics
+          path: diagnostics/
           if-no-files-found: ignore
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Till-Counter-v0.1.0-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
