@@ -47,8 +47,8 @@ PY
       }
       return 0
     fi
-    # Scroll only inside Till Counter's reported ScrollView bounds. Never use
-    # fixed coordinates near Android's navigation area.
+    # Only Settings/Summary are allowed to scroll. Counting screens intentionally
+    # expose every control in the fixed viewport, so absence there is a failure.
     if ! python3 <<'PY'
 import re,subprocess,xml.etree.ElementTree as ET
 root=ET.parse('ui.xml').getroot()
@@ -63,7 +63,7 @@ for n in root.iter('node'):
 raise SystemExit(1)
 PY
     then
-      echo "No Till Counter ScrollView available while searching for: $needle"
+      echo "Control is not visible in fixed Till Counter viewport: $needle"
       cat ui.xml
       exit 1
     fi
