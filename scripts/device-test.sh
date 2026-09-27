@@ -15,10 +15,23 @@ tap_text(){
     if python3 - "$needle" <<'PY'
 import re,sys,subprocess,xml.etree.ElementTree as ET
 needle=sys.argv[1]; root=ET.parse('ui.xml').getroot()
+scroll=None
+for n in root.iter('node'):
+    if n.attrib.get('class')=='android.widget.ScrollView':
+        sm=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
+        if sm: scroll=tuple(map(int,sm.groups()))
 for n in root.iter('node'):
     if n.attrib.get('text')==needle:
         m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
-        subprocess.check_call(['adb','shell','input','tap',str((int(m[1])+int(m[3]))//2),str((int(m[2])+int(m[4]))//2)])
+        if not m: continue
+        x1,y1,x2,y2=map(int,m.groups()); x=(x1+x2)//2; y=(y1+y2)//2
+        # UIAutomator can expose a partially clipped descendant. Never tap it
+        # unless its center is safely inside the app ScrollView.
+        if scroll:
+            sx1,sy1,sx2,sy2=scroll
+            if not (sx1+8 <= x <= sx2-8 and sy1+24 <= y <= sy2-24):
+                continue
+        subprocess.check_call(['adb','shell','input','tap',str(x),str(y)])
         sys.exit(0)
 sys.exit(1)
 PY
