@@ -26,7 +26,7 @@ PY
 }
 tap_text(){
   local needle="$1"
-  for attempt in $(seq 1 8); do
+  for attempt in $(seq 1 4); do
     dump
     if python3 - "$needle" <<'PY'
 import re,sys,subprocess,xml.etree.ElementTree as ET
@@ -168,7 +168,7 @@ tap_text 'FINISH'; wait_text 'Till Summary'
 
 # SETTINGS persistence survives force-stop/process restart.
 tap_text 'Settings'; wait_text 'SETTINGS'
-assert_text '$300.00'
+tap_text 'Base till amount'; assert_text '$300.00'
 
 # NEW COUNT clears transactional state but not persistent Settings.
 tap_text 'NEW COUNT'; wait_text 'Store Charges'; assert_text '$0.00'
@@ -176,8 +176,7 @@ adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/$ACT" >/dev/null
 wait_text 'Store Charges'; assert_text '$0.00'
 tap_text 'Settings'; wait_text 'SETTINGS'
-dump
-assert_text '$300.00'
+tap_text 'Base till amount'; assert_text '$300.00'
 dump
 python3 <<'PY'
 import xml.etree.ElementTree as ET
