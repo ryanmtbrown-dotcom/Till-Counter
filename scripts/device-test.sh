@@ -8,7 +8,11 @@ adb shell am start -W -n "$PKG/$ACT" | tee start.txt
 grep -Fq 'Status: ok' start.txt
 test -n "$(adb shell pidof "$PKG")"
 dump(){ adb shell uiautomator dump /sdcard/ui.xml >/dev/null; adb pull /sdcard/ui.xml ui.xml >/dev/null; }
-tap_text(){ dump; python3 - "$1" <<'PY'
+tap_text(){
+  local needle="$1"
+  for attempt in $(seq 1 8); do
+    dump
+    if python3 - "$needle" <<'PY'
 import re,sys,subprocess,xml.etree.ElementTree as ET
 needle=sys.argv[1]; root=ET.parse('ui.xml').getroot()
 for n in root.iter('node'):
@@ -16,9 +20,20 @@ for n in root.iter('node'):
         m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
         subprocess.check_call(['adb','shell','input','tap',str((int(m[1])+int(m[3]))//2),str((int(m[2])+int(m[4]))//2)])
         sys.exit(0)
-raise SystemExit('missing UI text: '+needle)
+sys.exit(1)
 PY
-sleep .3
+    then
+      sleep .3
+      return 0
+    fi
+    # Native ScrollView exposes only visible descendants to uiautomator.
+    # Search a bounded distance downward before declaring the control absent.
+    adb shell input swipe 540 1500 540 650 250 >/dev/null
+    sleep .2
+  done
+  echo "missing UI text after bounded scroll search: $needle"
+  cat ui.xml
+  exit 1
 }
 assert_text(){ dump; grep -Fq "text=\"$1\"" ui.xml || { echo "missing text: $1"; cat ui.xml; exit 1; }; }
 wait_text(){
