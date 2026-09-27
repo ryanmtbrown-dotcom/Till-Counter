@@ -199,9 +199,11 @@ class MainActivity : AppCompatActivity() {
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
         col.addView(nav, matchWrap())
         col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(26), 0, dp(8)) })
-        col.addView(label("Version ${BuildConfig.VERSION_NAME}", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(8)) })
+        col.addView(label("Version ${appVersion()}", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(8)) })
         col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)))
     }
+
+    private fun appVersion(): String = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
 
     private fun checkForUpdate() {
         Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
@@ -211,7 +213,7 @@ class MainActivity : AppCompatActivity() {
                     connectTimeout = 10000
                     readTimeout = 10000
                     setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "Till-Counter/${BuildConfig.VERSION_NAME}")
+                    setRequestProperty("User-Agent", "Till-Counter/${appVersion()}")
                 }
                 val body = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(body)
@@ -227,7 +229,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 connection.disconnect()
                 runOnUiThread {
-                    if (isNewerVersion(tag, BuildConfig.VERSION_NAME) && apkUrl != null) {
+                    if (isNewerVersion(tag, appVersion()) && apkUrl != null) {
                         android.app.AlertDialog.Builder(this)
                             .setTitle("Till Counter $tag available")
                             .setMessage("Download and install the update now?")
@@ -254,7 +256,7 @@ class MainActivity : AppCompatActivity() {
                     connectTimeout = 15000
                     readTimeout = 30000
                     instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "Till-Counter/${BuildConfig.VERSION_NAME}")
+                    setRequestProperty("User-Agent", "Till-Counter/${appVersion()}")
                 }
                 connection.inputStream.use { inputStream -> apk.outputStream().use { output -> inputStream.copyTo(output) } }
                 connection.disconnect()
@@ -267,7 +269,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchInstaller(apk: File) {
-        val uri: Uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.updates", apk)
+        val uri: Uri = FileProvider.getUriForFile(this, "com.tillcounter.app.updates", apk)
         startActivity(Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
