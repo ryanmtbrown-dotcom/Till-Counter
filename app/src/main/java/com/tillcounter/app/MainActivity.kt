@@ -4,6 +4,14 @@ import android.animation.ObjectAnimator
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -190,6 +198,91 @@ class MainActivity : AppCompatActivity() {
         nav.addView(action("BACK") { stage = stages.size; cashIndex = cashLabels.lastIndex; render() }, weightedButton(10))
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
         col.addView(nav, matchWrap())
+        col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(26), 0, dp(8)) })
+        col.addView(label("Version ${BuildConfig.VERSION_NAME}", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(8)) })
+        col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)))
+    }
+
+    private fun checkForUpdate() {
+        Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        thread {
+            try {
+                val connection = (URL("https://api.github.com/repos/ryanmtbrown-dotcom/Till-Counter/releases/latest").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "Till-Counter/${BuildConfig.VERSION_NAME}")
+                }
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(body)
+                val tag = json.getString("tag_name").removePrefix("v")
+                val assets = json.getJSONArray("assets")
+                var apkUrl: String? = null
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    if (asset.getString("name").endsWith(".apk", ignoreCase = true)) {
+                        apkUrl = asset.getString("browser_download_url")
+                        break
+                    }
+                }
+                connection.disconnect()
+                runOnUiThread {
+                    if (isNewerVersion(tag, BuildConfig.VERSION_NAME) && apkUrl != null) {
+                        android.app.AlertDialog.Builder(this)
+                            .setTitle("Till Counter $tag available")
+                            .setMessage("Download and install the update now?")
+                            .setNegativeButton("Later", null)
+                            .setPositiveButton("Update") { _, _ -> downloadUpdate(apkUrl!!, tag) }
+                            .show()
+                    } else {
+                        Toast.makeText(this, "Till Counter is up to date.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Could not check for updates. Try again later.", Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    private fun downloadUpdate(url: String, version: String) {
+        Toast.makeText(this, "Downloading Till Counter $version…", Toast.LENGTH_LONG).show()
+        thread {
+            try {
+                val dir = File(cacheDir, "updates").apply { mkdirs() }
+                val apk = File(dir, "Till-Counter-v$version.apk")
+                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Till-Counter/${BuildConfig.VERSION_NAME}")
+                }
+                connection.inputStream.use { inputStream -> apk.outputStream().use { output -> inputStream.copyTo(output) } }
+                connection.disconnect()
+                if (!apk.isFile || apk.length() < 1024) throw IllegalStateException("Downloaded APK is empty")
+                runOnUiThread { launchInstaller(apk) }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Update download failed. Try again later.", Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    private fun launchInstaller(apk: File) {
+        val uri: Uri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.updates", apk)
+        startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
+    }
+
+    private fun isNewerVersion(candidate: String, current: String): Boolean {
+        val a = candidate.split('.').map { it.toIntOrNull() ?: 0 }
+        val b = current.split('.').map { it.toIntOrNull() ?: 0 }
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val av = a.getOrElse(i) { 0 }
+            val bv = b.getOrElse(i) { 0 }
+            if (av != bv) return av > bv
+        }
+        return false
     }
 
     private fun moneyPad(col: LinearLayout) {
