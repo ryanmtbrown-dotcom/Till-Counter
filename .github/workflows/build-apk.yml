@@ -39,7 +39,8 @@ jobs:
           test -s app/src/main/assets/splash.png
           test -s app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           grep -q 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
-          grep -q 'file:///android_asset/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
+          grep -q 'https://appassets.androidplatform.net/assets/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
+          ! grep -q 'file:///android_asset' app/src/main/java/com/tillcounter/app/MainActivity.java
           grep -q 'versionName = "0.2.0"' app/build.gradle.kts
 
       - name: Build debug APK
