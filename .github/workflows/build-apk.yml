@@ -44,11 +44,26 @@ jobs:
           "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$APK" > apk-badging.txt
           grep -Fq "package: name='com.tillcounter.app'" apk-badging.txt
           grep -Fq "targetSdkVersion:'36'" apk-badging.txt
+          grep -Fq "sdkVersion:'24'" apk-badging.txt
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Android 7 compatibility functional test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 24
+          arch: x86
+          profile: pixel
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/device-test.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Preserve Android 7 proof
+        run: |
+          mv start.txt start-api24.txt
+          mv device.log device-api24.log
+          mv final-screen.png final-screen-api24.png
       - name: Android 16 complete functional test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -75,6 +90,9 @@ jobs:
             apk-signature.txt
             apk-badging.txt
             apk-resources.txt
+            start-api24.txt
+            device-api24.log
+            final-screen-api24.png
             start.txt
             device.log
             final-screen.png
