@@ -29,7 +29,9 @@ for n in root.iter('node'):
         # unless its center is safely inside the app ScrollView.
         if scroll:
             sx1,sy1,sx2,sy2=scroll
-            if not (sx1+8 <= x <= sx2-8 and sy1+24 <= y <= sy2-24):
+            safe_top=max(sy1+80, 120)
+            safe_bottom=min(sy2-180, 1450)
+            if not (sx1+8 <= x <= sx2-8 and safe_top <= y <= safe_bottom):
                 continue
         subprocess.check_call(['adb','shell','input','tap',str(x),str(y)])
         sys.exit(0)
