@@ -165,7 +165,7 @@ tap_text 'BACK'; wait_text 'Pennies'; assert_text 'LOOSE: 12'; assert_text 'ROLL
 tap_text 'FINISH'; wait_text 'Till Summary'
 
 # SETTINGS persistence survives force-stop/process restart.
-tap_text 'Settings'; wait_text 'SETTINGS'; assert_text 'Version 1.2.0'
+tap_text 'Settings'; wait_text 'SETTINGS'; assert_text 'Version 1.2.1'
 assert_text '$300.00'
 
 # NEW COUNT clears transactional state but not persistent Settings.
