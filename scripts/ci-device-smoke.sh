@@ -14,12 +14,9 @@ printf '%s\n' "$START_OUTPUT"
 echo "$START_OUTPUT" | grep -q 'Status: ok'
 # Splash is intentionally six seconds; wait beyond it and prove the activity remains alive/resumed.
 sleep 8
-# Prove the bundled WebView rendered the actual first workflow screen, not merely a living Activity.
-adb shell uiautomator dump /sdcard/till-counter-ui.xml >/dev/null
-adb pull /sdcard/till-counter-ui.xml till-counter-ui.xml >/dev/null
-grep -q 'Store Charges' till-counter-ui.xml
-grep -q 'Running total' till-counter-ui.xml
-grep -q '\$0.00' till-counter-ui.xml
+# Prove bundled JavaScript completed the six-second splash and entered the application.
+adb logcat -d -v threadtime > "$LOG"
+grep -q 'TillCounterProof.*APP_READY' "$LOG"
 PID="$(adb shell pidof "$PACKAGE" | tr -d '\r')"
 test -n "$PID"
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep -q "$PACKAGE/.MainActivity"

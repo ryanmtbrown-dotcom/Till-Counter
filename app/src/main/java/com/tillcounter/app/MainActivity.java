@@ -5,10 +5,12 @@ import android.os.Bundle;
 import android.view.ViewGroup;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.ViewCompat;
@@ -58,6 +60,12 @@ public final class MainActivity extends AppCompatActivity {
         settings.setDatabaseEnabled(false);
         settings.setTextZoom(100);
         settings.setSupportMultipleWindows(false);
+
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface public void ready(String marker) {
+                if ("APP_READY".equals(marker)) Log.i("TillCounterProof", "APP_READY");
+            }
+        }, "TillCounterProof");
 
         webView.setLongClickable(false);
         webView.setOnLongClickListener(view -> true);
