@@ -4,7 +4,7 @@ android {
  namespace = "com.tillcounter.app"
  compileSdk = 36
  signingConfigs { create("stable") { storeFile = rootProject.file("signing/till-counter.jks"); storePassword = "tillcounter"; keyAlias = "tillcounter"; keyPassword = "tillcounter" } }
- defaultConfig { applicationId = "com.tillcounter.app"; minSdk = 26; targetSdk = 36; versionCode = providers.gradleProperty("TILL_VERSION_CODE").get().toInt(); versionName = providers.gradleProperty("TILL_VERSION_NAME").get() }
+ defaultConfig { applicationId = "com.tillcounter.app"; minSdk = 24; targetSdk = 36; versionCode = providers.gradleProperty("TILL_VERSION_CODE").get().toInt(); versionName = providers.gradleProperty("TILL_VERSION_NAME").get() }
  buildTypes { getByName("debug") { signingConfig = signingConfigs.getByName("stable") } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
