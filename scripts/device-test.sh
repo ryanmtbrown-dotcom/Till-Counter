@@ -99,6 +99,14 @@ for n in root.iter('node'):
         raise SystemExit(0)
 raise SystemExit('missing base till EditText')
 PY
+dump
+python3 <<'PY'
+import xml.etree.ElementTree as ET
+root=ET.parse('ui.xml').getroot()
+vals=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('class','').endswith('EditText')]
+if '300.00' not in vals:
+    raise SystemExit('Base Till field did not contain exact value 300.00: '+repr(vals))
+PY
 # Base Till deliberately suppresses the Android soft keyboard. Prove the
 # Activity stayed foreground after entering the value before saving.
 FOREGROUND="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
