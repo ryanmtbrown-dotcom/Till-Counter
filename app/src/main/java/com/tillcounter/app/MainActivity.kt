@@ -54,10 +54,18 @@ class MainActivity : AppCompatActivity() {
     private fun root(): FrameLayout = FrameLayout(this).apply {
         setBackgroundColor(Color.rgb(7, 26, 20))
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            val safe = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
             insets
         }
+        addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) {
+                ViewCompat.requestApplyInsets(view)
+            }
+            override fun onViewDetachedFromWindow(view: View) = Unit
+        })
     }
 
     private fun showSplash() {
