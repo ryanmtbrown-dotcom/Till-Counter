@@ -63,9 +63,10 @@ jobs:
           sha256sum "$APK" | tee apk-build.sha256
           APKSIGNER="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n1)"
           test -x "$APKSIGNER"
-          SIGNER="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n1)"
-          test "$SIGNER" = '79b76b3dc2e82e5842e5b0de8ab3278332383c8e063d1f4039d4f0e3a65940e0'
-          echo "STABLE_SIGNER_PASS $SIGNER"
+          CERTS="$("$APKSIGNER" verify --print-certs "$APK")"
+          printf '%s\n' "$CERTS"
+          echo "$CERTS" | tr '[:upper:]' '[:lower:]' | grep -Fq '79b76b3dc2e82e5842e5b0de8ab3278332383c8e063d1f4039d4f0e3a65940e0'
+          echo STABLE_SIGNER_PASS
 
       - name: Enable KVM
         run: |
