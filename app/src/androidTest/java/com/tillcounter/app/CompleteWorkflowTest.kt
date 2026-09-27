@@ -68,14 +68,18 @@ class CompleteWorkflowTest {
             val cb = waitText(name)
             if (!cb.isChecked) cb.click()
         }
-        val edit = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 3_000)
-            ?: throw AssertionError("Missing Base Till EditText")
-        edit.text = "300.00"
-        assertEquals("300.00", edit.text)
+        assertTrue("Settings must not depend on Android EditText entry", !device.hasObject(By.clazz("android.widget.EditText")))
+        digits("3","00",".","0","0")
+        assertText("\$300.00")
         tap("DONE"); assertText("Store Charges")
 
         // Money editing, commit, remove, backspace, BACK and pending NEXT.
+        // Add enough rows to overflow the history viewport. NEXT must remain visible without page scrolling.
         tap("9"); tap("C"); assertText("\$0.00")
+        listOf("1","2","3","4","5").forEach { amount -> tap(amount); tap("+") }
+        assertText("SUBTOTAL"); assertText("\$15.00")
+        assertTrue("NEXT pushed off-screen by amount history", device.hasObject(By.text("NEXT")))
+        repeat(5) { tap("Remove") }
         digits("1",".","0","0"); tap("+"); assertText("\$1.00"); tap("Remove"); assertText("\$0.00")
         digits("5","4",".","2","4"); tap("⌫"); tap("3"); assertText("\$54.23")
         tap("NEXT"); assertText("Gift Certificates")
@@ -108,9 +112,8 @@ class CompleteWorkflowTest {
         // NEW COUNT clears transaction state while Settings remain persistent in the app session.
         tap("NEW COUNT"); assertText("Store Charges"); assertText("\$0.00")
         tapDesc("Settings"); assertText("SETTINGS")
-        val persisted = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 3_000)
-            ?: throw AssertionError("Missing Base Till after NEW COUNT")
-        assertEquals("300.00", persisted.text)
+        assertText("\$300.00")
+        assertTrue("Settings unexpectedly exposes Android EditText after NEW COUNT", !device.hasObject(By.clazz("android.widget.EditText")))
         listOf("Store Charges","Gift Certificates","Vendor Coupons","Checks","Loans").forEach { name ->
             assertTrue("\$name unexpectedly disabled", waitText(name).isChecked)
         }
