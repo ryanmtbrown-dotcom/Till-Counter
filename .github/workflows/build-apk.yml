@@ -67,7 +67,7 @@ jobs:
           profile: pixel
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: bash scripts/device-test.sh app/build/outputs/apk/debug/app-debug.apk
+          script: timeout --foreground 8m bash scripts/device-test.sh app/build/outputs/apk/debug/app-debug.apk
       - name: Preserve Android 7 proof
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.android16_only != true }}
         run: |
@@ -84,7 +84,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: |
             adb logcat -c
-            gradle --no-daemon :app:connectedDebugAndroidTest
+            timeout --foreground 10m gradle --no-daemon :app:connectedDebugAndroidTest
             echo INSTRUMENTATION_ANDROID16_PASS > start.txt
             adb logcat -d -v threadtime > device.log
             if grep -E 'FATAL EXCEPTION|AndroidRuntime.*Process: com\\.tillcounter\\.app' device.log; then cat device.log; exit 1; fi
