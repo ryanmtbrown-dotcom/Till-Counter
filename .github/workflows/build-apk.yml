@@ -40,7 +40,7 @@ jobs:
           test -s app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           grep -q 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
           grep -q 'file:///android_asset/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
-          grep -q 'versionName = "0.1.2"' app/build.gradle.kts
+          grep -q 'versionName = "0.2.0"' app/build.gradle.kts
 
       - name: Build debug APK
         run: gradle --stacktrace :app:assembleDebug
@@ -69,7 +69,7 @@ jobs:
       - name: Install APK and prove real Android startup
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 36
           arch: x86_64
           profile: pixel_7_pro
           disable-animations: true
@@ -80,20 +80,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk release/Till-Counter-v0.1.2.apk
-          sha256sum release/Till-Counter-v0.1.2.apk | tee release/Till-Counter-v0.1.2.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk release/Till-Counter-v0.2.0.apk
+          sha256sum release/Till-Counter-v0.2.0.apk | tee release/Till-Counter-v0.2.0.apk.sha256
 
       - name: Upload proof bundle
         uses: actions/upload-artifact@v4
         with:
-          name: Till-Counter-v0.1.2-Proof
+          name: Till-Counter-v0.2.0-Proof
           path: |
-            release/Till-Counter-v0.1.2.apk
-            release/Till-Counter-v0.1.2.apk.sha256
+            release/Till-Counter-v0.2.0.apk
+            release/Till-Counter-v0.2.0.apk.sha256
             apk-contents.txt
             apk-build.sha256
             device-smoke-logcat.txt
             device-smoke.png
+            till-counter-ui.xml
           if-no-files-found: error
 
       - name: Publish release only after all proof gates pass
@@ -102,17 +103,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG=v0.1.2
-          APK=release/Till-Counter-v0.1.2.apk
-          SUM=release/Till-Counter-v0.1.2.apk.sha256
+          TAG=v0.2.0
+          APK=release/Till-Counter-v0.2.0.apk
+          SUM=release/Till-Counter-v0.2.0.apk.sha256
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$SUM" --clobber
           else
-            gh release create "$TAG" "$APK" "$SUM" --target "$GITHUB_SHA" --title 'Till Counter v0.1.2' --notes 'Release published only after build, APK-content verification, installation on an Android 15 emulator, successful MainActivity launch, eight-second survival beyond the six-second splash, resumed-activity verification, and fatal-runtime-log checks passed.'
+            gh release create "$TAG" "$APK" "$SUM" --target "$GITHUB_SHA" --title 'Till Counter v0.2.0' --notes 'Release published only after build, APK-content verification, installation on an Android 16 emulator, successful MainActivity launch, rendered Store Charges workflow verification after the six-second splash, resumed-activity verification, and fatal-runtime-log checks passed.'
           fi
-          gh release download "$TAG" --pattern 'Till-Counter-v0.1.2.apk' --dir release-verify
-          test -s release-verify/Till-Counter-v0.1.2.apk
-          cmp "$APK" release-verify/Till-Counter-v0.1.2.apk
+          gh release download "$TAG" --pattern 'Till-Counter-v0.2.0.apk' --dir release-verify
+          test -s release-verify/Till-Counter-v0.2.0.apk
+          cmp "$APK" release-verify/Till-Counter-v0.2.0.apk
           echo 'RELEASE_ROUNDTRIP_PASS'
 
       - name: Collect diagnostics on failure
@@ -129,6 +130,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: Till-Counter-v0.1.2-Failure-Diagnostics
+          name: Till-Counter-v0.2.0-Failure-Diagnostics
           path: diagnostics/
           if-no-files-found: ignore

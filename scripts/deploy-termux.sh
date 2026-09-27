@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$HOME/Till-Counter"
 REPO='ryanmtbrown-dotcom/Till-Counter'
-VERSION='0.1.2'
+VERSION='0.2.0'
 TAG="v$VERSION"
 APK="Till-Counter-$TAG.apk"
 LOGDIR="$HOME/Till-Counter-Build-Logs"
@@ -11,7 +11,7 @@ mkdir -p "$LOGDIR" "$OUT"
 
 echo '=== TILL COUNTER: SOURCE -> PROVEN APK -> RELEASE -> PHONE ==='
 gh auth status
-grep -q 'versionName = "0.1.2"' app/build.gradle.kts
+grep -q 'versionName = "0.2.0"' app/build.gradle.kts
 test -f app/src/main/java/com/tillcounter/app/MainActivity.java
 test ! -e app/src/main/java/com/tillcounter/app/MainActivity.kt
 
