@@ -7,7 +7,7 @@ adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/$ACT" | tee start.txt
 grep -Fq 'Status: ok' start.txt
 sleep 7
-adb shell dumpsys activity activities | grep -F 'mResumedActivity' | grep -F "$PKG"
+test -n "$(adb shell pidof "$PKG")"
 dump(){ adb shell uiautomator dump /sdcard/ui.xml >/dev/null; adb pull /sdcard/ui.xml ui.xml >/dev/null; }
 tap_text(){ dump; python3 - "$1" <<'PY'
 import re,sys,subprocess,xml.etree.ElementTree as ET
