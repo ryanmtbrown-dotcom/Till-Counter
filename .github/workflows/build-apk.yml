@@ -61,6 +61,9 @@ jobs:
           # classes.dex must exist; MainActivity presence is then proven at runtime by the emulator launch below.
           grep -q 'classes.dex' apk-contents.txt
           sha256sum "$APK" | tee apk-build.sha256
+          SIGNER="$(keytool -printcert -jarfile "$APK" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n1)"
+          test "$SIGNER" = '79:B7:6B:3D:C2:E8:2E:58:42:E5:B0:DE:8A:B3:27:83:32:38:3C:8E:06:3D:1F:40:39:D4:F0:E3:A6:59:40:E0'
+          echo "STABLE_SIGNER_PASS $SIGNER"
 
       - name: Enable KVM
         run: |
