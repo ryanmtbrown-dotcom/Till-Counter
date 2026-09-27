@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.ViewGroup;
 import android.util.Log;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceResponse;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -74,7 +75,12 @@ public final class MainActivity extends AppCompatActivity {
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return loader.shouldInterceptRequest(request.getUrl());
             }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                Log.e("TillCounterProof", "LOAD_ERROR url=" + request.getUrl() + " code=" + error.getErrorCode() + " desc=" + error.getDescription());
+                super.onReceivedError(view, request, error);
+            }
             @Override public void onPageFinished(WebView view, String url) {
+                Log.i("TillCounterProof", "PAGE_FINISHED url=" + url);
                 super.onPageFinished(view, url);
                 view.postDelayed(() -> view.evaluateJavascript(
                     "(function(){var s=document.getElementById('splash'),a=document.getElementById('app'),t=document.getElementById('title'),r=document.getElementById('running'),d=document.getElementById('display');return !!(s&&s.classList.contains('hidden')&&a&&!a.classList.contains('hidden')&&t&&t.textContent==='Store Charges'&&r&&r.textContent==='$0.00'&&d&&d.textContent==='$0.00')?'READY':'NOT_READY';})()",

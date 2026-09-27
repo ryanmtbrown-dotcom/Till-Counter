@@ -26,6 +26,8 @@ if grep -E "FATAL EXCEPTION|Process: $PACKAGE.*has died|Unable to instantiate ac
   echo 'Fatal runtime evidence found.' >&2
   exit 1
 fi
+echo '=== WEBVIEW DIAGNOSTICS ==='
+grep -E 'TillCounterProof|chromium|WebView|cr_' "$LOG" | tail -200 || true
 grep -F 'TillCounterProof' "$LOG"
 grep -F 'TillCounterProof' "$LOG" | grep -Fq 'APP_STATE="READY"'
 echo "DEVICE_SMOKE_PASS pid=$PID"
