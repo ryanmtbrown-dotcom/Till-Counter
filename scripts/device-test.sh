@@ -40,7 +40,7 @@ for k in 2 . 5 0; do tap_text "$k"; done
 tap_text 'NEXT'; assert_text 'Vendor Coupons'
 tap_text 'NEXT'; assert_text 'Checks'
 tap_text 'NEXT'; assert_text 'Loans'
-tap_text 'NEXT'; assert_text 'Cash'; assert_text '$100 bills'
+tap_text 'NEXT: CASH'; assert_text 'Cash'; assert_text '$100 bills'
 tap_text '2'; tap_text 'NEXT'; assert_text '$50 bills'
 for i in $(seq 1 11); do tap_text 'NEXT'; done
 assert_text 'Pennies'; tap_text 'FINISH'
