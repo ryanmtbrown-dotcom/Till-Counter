@@ -25,14 +25,18 @@ for n in root.iter('node'):
         m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
         if not m: continue
         x1,y1,x2,y2=map(int,m.groups()); x=(x1+x2)//2; y=(y1+y2)//2
-        # UIAutomator can expose a partially clipped descendant. Never tap it
-        # unless its center is safely inside the app ScrollView.
+        # Apply ScrollView clipping rules only to nodes that actually intersect
+        # the ScrollView. Fixed siblings such as Settings DONE remain tappable.
         if scroll:
             sx1,sy1,sx2,sy2=scroll
-            safe_top=max(sy1+80, 120)
-            safe_bottom=min(sy2-180, 1450)
-            if not (sx1+8 <= x <= sx2-8 and safe_top <= y <= safe_bottom):
-                continue
+            intersects = not (x2 <= sx1 or x1 >= sx2 or y2 <= sy1 or y1 >= sy2)
+            if intersects:
+                safe_top=max(sy1+80, 120)
+                safe_bottom=min(sy2-180, 1450)
+                if not (sx1+8 <= x <= sx2-8 and safe_top <= y <= safe_bottom):
+                    continue
+        if x < 8 or y < 24 or x > 1072 or y > 1770:
+            continue
         subprocess.check_call(['adb','shell','input','tap',str(x),str(y)])
         sys.exit(0)
 sys.exit(1)
