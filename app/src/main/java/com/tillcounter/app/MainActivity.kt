@@ -155,7 +155,7 @@ class MainActivity : AppCompatActivity() {
             addView(label("SUBTOTAL", 13, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, dp(38), 1f))
             addView(label(money(list.sum()), 18, true, Color.WHITE).apply { gravity = Gravity.CENTER_VERTICAL })
         }, LinearLayout.LayoutParams(-1, dp(38)))
-        col.addView(history, LinearLayout.LayoutParams(-1, dp(128)).apply { bottomMargin = dp(8) })
+        col.addView(history, LinearLayout.LayoutParams(-1, 0, 1f).apply { bottomMargin = dp(8) })
         if (list.isNotEmpty()) scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
         col.addView(display(if (input.isBlank()) "$0.00" else "$$input"))
         moneyPad(col)
