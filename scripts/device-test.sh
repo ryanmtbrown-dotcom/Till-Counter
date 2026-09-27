@@ -24,14 +24,37 @@ sys.exit(1)
 PY
     then
       sleep .3
+      FG="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
+      echo "$FG" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
+        echo "Till Counter lost foreground immediately after tapping: $needle"
+        echo "$FG"
+        exit 1
+      }
       return 0
     fi
-    # Native ScrollView exposes only visible descendants to uiautomator.
-    # Search a bounded distance downward before declaring the control absent.
-    adb shell input swipe 540 1500 540 650 250 >/dev/null
+    # Scroll only inside Till Counter's reported ScrollView bounds. Never use
+    # fixed coordinates near Android's navigation area.
+    if ! python3 <<'PY'
+import re,subprocess,xml.etree.ElementTree as ET
+root=ET.parse('ui.xml').getroot()
+for n in root.iter('node'):
+    if n.attrib.get('class')=='android.widget.ScrollView':
+        m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
+        x=(int(m[1])+int(m[3]))//2
+        top=int(m[2]); bottom=int(m[4])
+        y1=top+int((bottom-top)*0.72); y2=top+int((bottom-top)*0.32)
+        subprocess.check_call(['adb','shell','input','swipe',str(x),str(y1),str(x),str(y2),'250'])
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+    then
+      echo "No Till Counter ScrollView available while searching for: $needle"
+      cat ui.xml
+      exit 1
+    fi
     sleep .2
   done
-  echo "missing UI text after bounded scroll search: $needle"
+  echo "missing UI text after bounded in-app scroll search: $needle"
   cat ui.xml
   exit 1
 }
