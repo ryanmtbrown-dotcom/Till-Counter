@@ -41,8 +41,8 @@ jobs:
           grep -Fq 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
           grep -Fq 'https://appassets.androidplatform.net/assets/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
           if grep -Fq 'file:///android_asset' app/src/main/java/com/tillcounter/app/MainActivity.java; then echo 'obsolete file asset route found' >&2; exit 1; fi
-          grep -Fq 'versionName = "0.2.0"'
-          echo SOURCE_CONTRACT_PASS app/build.gradle.kts
+          grep -Fq 'versionName = "0.2.0"' app/build.gradle.kts
+          echo SOURCE_CONTRACT_PASS
 
       - name: Build debug APK
         run: gradle --stacktrace :app:assembleDebug
