@@ -208,12 +208,6 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.rgb(16, 42, 33)); setPadding(dp(16), 0, dp(16), 0)
         }
         col.addView(base, LinearLayout.LayoutParams(-1, dp(54)))
-        col.addView(navButton("SAVE BASE TILL", true) {
-            val cents = parseCents(base.text.toString()) ?: 0L
-            settings.setBaseTillCents(cents)
-            base.clearFocus()
-            Toast.makeText(this, "Base till saved: " + money(cents), Toast.LENGTH_SHORT).show()
-        }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
         col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(18), 0, dp(5)) })
         col.addView(label("Version " + appVersion(), 14, false, Color.rgb(169, 184, 176)))
         col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
@@ -221,6 +215,8 @@ class MainActivity : AppCompatActivity() {
         shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val doneWrap = FrameLayout(this).apply { setPadding(0, dp(8), 0, dp(12)) }
         doneWrap.addView(navButton("DONE", true) {
+            val cents = parseCents(base.text.toString()) ?: 0L
+            settings.setBaseTillCents(cents)
             base.clearFocus()
             settingsOpen = false
             input = ""
