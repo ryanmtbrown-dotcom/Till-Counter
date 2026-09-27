@@ -296,7 +296,7 @@ class MainActivity : AppCompatActivity() {
             addView(label(money(grand), 34, true, Color.WHITE))
             if (baseTill > 0) {
                 addView(label("BASE TILL  " + money(baseTill), 14, true, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(10), 0, 0) })
-                addView(label("DROP  " + money(drop), 24, true, if (drop >= 0) Color.rgb(214, 183, 107) else Color.rgb(244, 170, 160)))
+                addView(label(if (drop >= 0) "DROP  " + money(drop) else "LOAN NEEDED  " + money(-drop), 24, true, if (drop >= 0) Color.rgb(214, 183, 107) else Color.rgb(244, 170, 160)))
             }
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         col.addView(label("Cash breakdown", 20, true, Color.WHITE).apply { setPadding(0, dp(22), 0, dp(8)) })
