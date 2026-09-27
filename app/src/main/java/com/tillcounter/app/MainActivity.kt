@@ -219,12 +219,14 @@ class MainActivity : AppCompatActivity() {
         col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
         scroll.addView(col, ViewGroup.LayoutParams(-1, -2))
         shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        shell.addView(navButton("DONE", true) {
+        val doneWrap = FrameLayout(this).apply { setPadding(0, dp(8), 0, dp(12)) }
+        doneWrap.addView(navButton("DONE", true) {
             base.clearFocus()
             settingsOpen = false
             input = ""
             render()
-        }, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(8) })
+        }, FrameLayout.LayoutParams(-1, dp(56)))
+        shell.addView(doneWrap, LinearLayout.LayoutParams(-1, dp(76)))
         outer.addView(shell, FrameLayout.LayoutParams(-1, -1))
         setContentView(outer)
     }
