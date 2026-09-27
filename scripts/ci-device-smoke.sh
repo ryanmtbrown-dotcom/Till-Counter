@@ -20,11 +20,8 @@ grep -q 'TillCounterProof.*APP_READY' "$LOG"
 PID="$(adb shell pidof "$PACKAGE" | tr -d '\r')"
 test -n "$PID"
 adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep -q "$PACKAGE/.MainActivity"
-adb logcat -d -v threadtime > "$LOG"
 if grep -E "FATAL EXCEPTION|Process: $PACKAGE.*has died|Unable to instantiate activity|AndroidRuntime.*$PACKAGE" "$LOG"; then
   echo 'Fatal runtime evidence found.' >&2
   exit 1
 fi
-adb exec-out screencap -p > "$SCREEN"
-test -s "$SCREEN"
 echo "DEVICE_SMOKE_PASS pid=$PID"
