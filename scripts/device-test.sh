@@ -132,8 +132,8 @@ tap_text 'NEXT'; assert_text 'Checks'
 tap_text 'NEXT'; assert_text 'Loans'
 tap_text 'NEXT: CASH'; assert_text 'Cash'; assert_text '$100 bills'
 tap_text '2'; tap_text 'NEXT'; assert_text '$50 bills'
-# Advance to quarters (100, 50, 20, 10, 5, 2, 1 bills, $1 coin, half dollar).
-for i in $(seq 1 9); do tap_text 'NEXT'; done
+# Starting at $50 bills, advance through 20, 10, 5, 2, 1 bills, $1 coin and half dollar to quarters.
+for i in $(seq 1 8); do tap_text 'NEXT'; done
 assert_text 'Quarters'; assert_text 'LOOSE: 0'; assert_text 'ROLLS: 0'
 tap_text '5'; tap_text 'ROLLS: 0'; tap_text '2'; tap_text 'NEXT'
 # Dimes, nickels, pennies.
