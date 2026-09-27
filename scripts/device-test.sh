@@ -61,7 +61,14 @@ for n in root.iter('node'):
         raise SystemExit(0)
 raise SystemExit('missing base till EditText')
 PY
-tap_text 'SAVE BASE TILL'; tap_text 'DONE'; assert_text 'Store Charges'
+# Explicitly dismiss the IME before using Settings actions. On Android 7 the
+# keyboard can otherwise consume/redirect subsequent automation taps.
+adb shell input keyevent 4
+sleep .3
+tap_text 'SAVE BASE TILL'
+tap_text 'DONE'
+wait_text 'Store Charges'
+assert_text '$0.00'
 # Single-entry contract: NEXT must commit the pending amount without requiring +.
 for k in 5 4 . 2 3; do tap_text "$k"; done
 tap_text 'NEXT'; assert_text 'Gift Certificates'
