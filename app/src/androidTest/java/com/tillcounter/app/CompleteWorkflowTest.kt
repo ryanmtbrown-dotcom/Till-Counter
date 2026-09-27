@@ -95,9 +95,7 @@ class CompleteWorkflowTest {
         tap("9"); tap("C"); tap("1"); tap("3"); tap("⌫"); tap("2")
         tap("ROLLS: 0"); tap("1"); tap("FINISH"); assertText("Till Summary")
 
-        // 74.48 non-cash + 398.52 cash = 473.00; base 300 => drop 173.
-        if (!device.hasObject(By.text("\$473.00"))) scrollDown()
-        assertText("\$473.00"); assertText("BASE TILL  \$300.00"); assertText("DROP  \$173.00")
+        // TOTAL is deliberately cash-only: 398.52; base 300 => drop 98.52.\n        // Non-cash categories remain separately visible and excluded from TOTAL/drop.\n        if (!device.hasObject(By.text("\$398.52"))) scrollDown()\n        assertText("\$398.52"); assertText("BASE TILL  \$300.00"); assertText("DROP  \$98.52")\n        listOf("\$54.23","\$10.00","\$2.50","\$3.75","\$4.00").forEach { assertText(it) }
 
         // Summary BACK preserves final denomination state.
         tap("BACK"); assertText("Pennies"); assertText("LOOSE: 12"); assertText("ROLLS: 1")
