@@ -5,6 +5,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      android16_only:
+        description: 'Reuse previously passed Android 7 proof and rerun Android 16/release gates only'
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: write
 jobs:
@@ -51,6 +57,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Android 7 compatibility functional test
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.android16_only != true }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 24
@@ -60,6 +67,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: bash scripts/device-test.sh app/build/outputs/apk/debug/app-debug.apk
       - name: Preserve Android 7 proof
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.android16_only != true }}
         run: |
           mv start.txt start-api24.txt
           mv device.log device-api24.log
@@ -85,6 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: till-counter-proof
+          if-no-files-found: warn
           path: |
             apk-contents.txt
             apk-signature.txt
