@@ -33,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private val cashCounts = IntArray(cashLabels.size)
     private val currency = NumberFormat.getCurrencyInstance(Locale.US)
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var settings: TillSettings
+    private var settingsOpen = false
     private var stage = 0
     private var cashIndex = 0
     private var input = ""
@@ -40,6 +42,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        settings = TillSettings(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         restore(state)
         if (state == null || !splashDone) showSplash() else render()
@@ -75,7 +78,7 @@ class MainActivity : AppCompatActivity() {
         handler.postDelayed({ splashDone = true; render() }, 6000)
     }
 
-    private fun render() = when {
+    private fun render() = if (settingsOpen) renderSettings() else when {
         stage < stages.size -> renderMoneyStage()
         stage == stages.size -> renderCashStage()
         else -> renderSummary()
@@ -89,7 +92,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(20), dp(22), dp(20), dp(20))
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        col.addView(label("TILL COUNTER", 16, true, Color.rgb(214, 183, 107)), matchWrap())
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label("TILL COUNTER", 16, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 22f }, LinearLayout.LayoutParams(dp(58), dp(50)))
+        col.addView(header, matchWrap())
         col.addView(label(title, 30, true, Color.WHITE).apply { setPadding(0, dp(8), 0, 0) }, matchWrap())
         col.addView(label(subtitle, 15, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(4), 0, dp(18)) }, matchWrap())
         scroll.addView(col, ViewGroup.LayoutParams(-1, -1))
@@ -99,6 +105,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderMoneyStage() {
+        if (!settings.isEnabled(stages[stage])) {
+            stage = nextEnabledStage(stage)
+            render()
+            return
+        }
         val list = entries[stage]
         val col = baseColumn(stages[stage], "Enter an amount. Tap + for another, or NEXT when finished.")
 
@@ -132,18 +143,56 @@ class MainActivity : AppCompatActivity() {
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         nav.addView(navButton("BACK", false) {
             if (stage > 0) {
-                stage--
+                stage = previousEnabledStage(stage) ?: 0
                 input = ""
                 render()
             }
         }, weightedButton(10))
         nav.addView(navButton(if (stage == stages.lastIndex) "NEXT: CASH" else "NEXT", true) {
             commitPendingMoney()
-            stage++
+            stage = nextEnabledStage(stage)
             input = ""
             render()
         }, LinearLayout.LayoutParams(0, dp(60), 1.35f))
         col.addView(nav, matchWrap())
+    }
+
+    private fun nextEnabledStage(from: Int): Int {
+        for (i in from + 1 until stages.size) if (settings.isEnabled(stages[i])) return i
+        return stages.size
+    }
+
+    private fun previousEnabledStage(from: Int): Int? {
+        for (i in from - 1 downTo 0) if (settings.isEnabled(stages[i])) return i
+        return null
+    }
+
+    private fun renderSettings() {
+        val col = baseColumn("Settings", "Choose the steps used during a count.")
+        stages.forEach { name ->
+            col.addView(CheckBox(this).apply {
+                text = name; textSize = 17f; setTextColor(Color.WHITE); isChecked = settings.isEnabled(name)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(214, 183, 107))
+                setOnCheckedChangeListener { _, checked -> settings.setEnabled(name, checked) }
+            }, LinearLayout.LayoutParams(-1, dp(52)))
+        }
+        col.addView(label("BASE TILL AMOUNT", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(20), 0, dp(6)) })
+        val base = EditText(this).apply {
+            setText(if (settings.baseTillCents() == 0L) "" else String.format(Locale.US, "%.2f", settings.baseTillCents() / 100.0))
+            hint = "Example: 300.00"; textSize = 20f; setTextColor(Color.WHITE); setHintTextColor(Color.rgb(169, 184, 176))
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setBackgroundColor(Color.rgb(16, 42, 33)); setPadding(dp(16), 0, dp(16), 0)
+        }
+        col.addView(base, LinearLayout.LayoutParams(-1, dp(58)))
+        col.addView(navButton("SAVE BASE TILL", true) {
+            val cents = parseCents(base.text.toString()) ?: 0L
+            settings.setBaseTillCents(cents)
+            Toast.makeText(this, "Base till saved: " + money(cents), Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
+        col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(24), 0, dp(6)) })
+        col.addView(label("Version " + appVersion(), 14, false, Color.rgb(169, 184, 176)))
+        col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
+        col.addView(navButton("DONE", true) { settingsOpen = false; input = ""; render() }, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(18) })
     }
 
     private fun commitPendingMoney(): Boolean {
@@ -179,9 +228,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderSummary() {
         val categoryTotals = entries.map { it.sum() }
         val cashTotal = cashCounts.indices.sumOf { cashCounts[it].toLong() * cashCents[it] }
-        val grand = categoryTotals.sum() + cashTotal
+        val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
+        val baseTill = settings.baseTillCents()
+        val drop = grand - baseTill
         val col = baseColumn("Till Summary", "Copy these totals to your till form.")
-        stages.forEachIndexed { index, name -> col.addView(summaryRow(name, categoryTotals[index])) }
+        stages.forEachIndexed { index, name -> if (settings.isEnabled(name)) col.addView(summaryRow(name, categoryTotals[index])) }
         col.addView(summaryRow("Cash", cashTotal))
         col.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -189,6 +240,10 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Color.rgb(16, 42, 33))
             addView(label("TOTAL", 15, true, Color.rgb(214, 183, 107)))
             addView(label(money(grand), 34, true, Color.WHITE))
+            if (baseTill > 0) {
+                addView(label("BASE TILL  " + money(baseTill), 14, true, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(10), 0, 0) })
+                addView(label("DROP  " + money(drop), 24, true, if (drop >= 0) Color.rgb(214, 183, 107) else Color.rgb(244, 170, 160)))
+            }
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         col.addView(label("Cash breakdown", 20, true, Color.WHITE).apply { setPadding(0, dp(22), 0, dp(8)) })
         cashCounts.indices.filter { cashCounts[it] > 0 }.forEach {
@@ -198,9 +253,7 @@ class MainActivity : AppCompatActivity() {
         nav.addView(action("BACK") { stage = stages.size; cashIndex = cashLabels.lastIndex; render() }, weightedButton(10))
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
         col.addView(nav, matchWrap())
-        col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(26), 0, dp(8)) })
-        col.addView(label("Version ${appVersion()}", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(8)) })
-        col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)))
+        
     }
 
     private fun appVersion(): String = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
@@ -367,14 +420,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(out: Bundle) {
         super.onSaveInstanceState(out)
-        out.putInt("stage", stage); out.putInt("cashIndex", cashIndex); out.putString("input", input); out.putBoolean("splashDone", splashDone)
+        out.putInt("stage", stage); out.putInt("cashIndex", cashIndex); out.putString("input", input); out.putBoolean("splashDone", splashDone); out.putBoolean("settingsOpen", settingsOpen)
         entries.indices.forEach { out.putLongArray("entry$it", entries[it].toLongArray()) }
         out.putIntArray("cashCounts", cashCounts)
     }
 
     private fun restore(state: Bundle?) {
         if (state == null) return
-        stage = state.getInt("stage"); cashIndex = state.getInt("cashIndex"); input = state.getString("input", ""); splashDone = state.getBoolean("splashDone")
+        stage = state.getInt("stage"); cashIndex = state.getInt("cashIndex"); input = state.getString("input", ""); splashDone = state.getBoolean("splashDone"); settingsOpen = state.getBoolean("settingsOpen")
         entries.indices.forEach { entries[it].addAll((state.getLongArray("entry$it") ?: longArrayOf()).toList()) }
         state.getIntArray("cashCounts")?.forEachIndexed { i, value -> if (i < cashCounts.size) cashCounts[i] = value }
     }
