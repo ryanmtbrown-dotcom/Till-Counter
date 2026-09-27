@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity() {
             setText(if (settings.baseTillCents() == 0L) "" else String.format(Locale.US, "%.2f", settings.baseTillCents() / 100.0))
             hint = "Example: 300.00"; textSize = 20f; setTextColor(Color.WHITE); setHintTextColor(Color.rgb(169, 184, 176))
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            showSoftInputOnFocus = false
             setBackgroundColor(Color.rgb(16, 42, 33)); setPadding(dp(16), 0, dp(16), 0)
         }
         col.addView(base, LinearLayout.LayoutParams(-1, dp(58)))
