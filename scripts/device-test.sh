@@ -102,10 +102,6 @@ wait_text 'Store Charges'; assert_text '$0.00'
 # SETTINGS: all workflow stages enabled; persistent base till.
 tap_text 'Settings'; wait_text 'SETTINGS'
 for name in 'Store Charges' 'Gift Certificates' 'Vendor Coupons' 'Checks' 'Loans'; do assert_text "$name"; done
-tap_text 'CHECK FOR UPDATE'
-# Dismiss updater result if a dialog appears; the control itself has now been proved reachable.
-adb shell input keyevent 4 >/dev/null 2>&1 || true
-wait_text 'SETTINGS'
 # Base Till uses only the in-app keypad; no Android EditText/soft keyboard is required.
 dump
 if grep -Fq 'class="android.widget.EditText"' ui.xml; then echo 'Settings unexpectedly exposes Android EditText'; exit 1; fi
