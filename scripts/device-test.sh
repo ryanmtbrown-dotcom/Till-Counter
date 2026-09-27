@@ -47,8 +47,11 @@ for n in root.iter('node'):
             sx1,sy1,sx2,sy2=scroll
             intersects = not (x2 <= sx1 or x1 >= sx2 or y2 <= sy1 or y1 >= sy2)
             if intersects:
-                safe_top=max(sy1+80, 120)
-                safe_bottom=min(sy2-180, 1450)
+                if sy2 - sy1 < 400:
+                    safe_top, safe_bottom = sy1, sy2
+                else:
+                    safe_top=max(sy1+80, 120)
+                    safe_bottom=min(sy2-180, 1450)
                 if not (sx1+8 <= x <= sx2-8 and safe_top <= y <= safe_bottom):
                     continue
         if x < 8 or y < 24 or x > 1072 or y > 1770:
