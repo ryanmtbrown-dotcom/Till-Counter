@@ -77,20 +77,20 @@ class CompleteWorkflowTest {
         tap("DONE"); assertText("Store Charges")
 
         // Money editing, commit, remove, backspace, BACK and pending NEXT.
-        tap("9"); tap("C"); assertText("$0.00")
-        digits("1",".","0","0"); tap("+"); assertText("$1.00"); tap("Remove"); assertText("$0.00")
-        digits("5","4",".","2","4"); tap("⌫"); tap("3"); assertText("$54.23")
+        tap("9"); tap("C"); assertText("\$0.00")
+        digits("1",".","0","0"); tap("+"); assertText("\$1.00"); tap("Remove"); assertText("\$0.00")
+        digits("5","4",".","2","4"); tap("⌫"); tap("3"); assertText("\$54.23")
         tap("NEXT"); assertText("Gift Certificates")
         digits("1","0",".","0","0"); tap("NEXT"); assertText("Vendor Coupons")
-        tap("BACK"); assertText("Gift Certificates"); assertText("$10.00")
+        tap("BACK"); assertText("Gift Certificates"); assertText("\$10.00")
         tap("NEXT"); assertText("Vendor Coupons")
         digits("2",".","5","0"); tap("NEXT"); assertText("Checks")
         digits("3",".","7","5"); tap("NEXT"); assertText("Loans")
-        digits("4",".","0","0"); tap("NEXT: CASH"); assertText("$100 bills")
+        digits("4",".","0","0"); tap("NEXT: CASH"); assertText("\$100 bills")
 
         // Every cash denomination receives nonzero data.
         listOf("1","2","3","4","5","6","7").forEach { n -> tap(n); tap("NEXT"); assertText("Cash") }
-        listOf("$1 coins","Half dollars","Quarters","Dimes","Nickels").forEach { label ->
+        listOf("\$1 coins","Half dollars","Quarters","Dimes","Nickels").forEach { label ->
             assertText(label); tap("1"); tap("ROLLS: 0"); tap("1"); tap("NEXT"); assertText("Cash")
         }
         assertText("Pennies")
@@ -98,15 +98,15 @@ class CompleteWorkflowTest {
         tap("ROLLS: 0"); tap("1"); tap("FINISH"); assertText("Till Summary")
 
         // 74.48 non-cash + 398.52 cash = 473.00; base 300 => drop 173.
-        if (!device.hasObject(By.text("$473.00"))) scrollDown()
-        assertText("$473.00"); assertText("BASE TILL  $300.00"); assertText("DROP  $173.00")
+        if (!device.hasObject(By.text("\$473.00"))) scrollDown()
+        assertText("\$473.00"); assertText("BASE TILL  \$300.00"); assertText("DROP  \$173.00")
 
         // Summary BACK preserves final denomination state.
         tap("BACK"); assertText("Pennies"); assertText("LOOSE: 12"); assertText("ROLLS: 1")
         tap("FINISH"); assertText("Till Summary")
 
         // Persistent settings survive process restart after NEW COUNT clears transaction state.
-        tap("NEW COUNT"); assertText("Store Charges"); assertText("$0.00")
+        tap("NEW COUNT"); assertText("Store Charges"); assertText("\$0.00")
         device.executeShellCommand("am force-stop $pkg")
         val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
         context.startActivity(context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
