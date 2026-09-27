@@ -519,14 +519,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(out: Bundle) {
         super.onSaveInstanceState(out)
-        out.putInt("stage", stage); out.putInt("cashIndex", cashIndex); out.putString("input", input); out.putBoolean("splashDone", splashDone); out.putBoolean("settingsOpen", settingsOpen)
+        out.putInt("stage", stage); out.putInt("cashIndex", cashIndex); out.putString("input", input); out.putString("settingsBaseInput", settingsBaseInput); out.putBoolean("splashDone", splashDone); out.putBoolean("settingsOpen", settingsOpen)
         entries.indices.forEach { out.putLongArray("entry$it", entries[it].toLongArray()) }
         out.putIntArray("cashCounts", cashCounts); out.putIntArray("rollCounts", rollCounts); out.putBoolean("editingRolls", editingRolls)
     }
 
     private fun restore(state: Bundle?) {
         if (state == null) return
-        stage = state.getInt("stage"); cashIndex = state.getInt("cashIndex"); input = state.getString("input", ""); splashDone = state.getBoolean("splashDone"); settingsOpen = state.getBoolean("settingsOpen")
+        stage = state.getInt("stage"); cashIndex = state.getInt("cashIndex"); input = state.getString("input", ""); settingsBaseInput = state.getString("settingsBaseInput", ""); splashDone = state.getBoolean("splashDone"); settingsOpen = state.getBoolean("settingsOpen")
         entries.indices.forEach { entries[it].addAll((state.getLongArray("entry$it") ?: longArrayOf()).toList()) }
         state.getIntArray("cashCounts")?.forEachIndexed { i, value -> if (i < cashCounts.size) cashCounts[i] = value }
         state.getIntArray("rollCounts")?.forEachIndexed { i, value -> if (i < rollCounts.size) rollCounts[i] = value }
