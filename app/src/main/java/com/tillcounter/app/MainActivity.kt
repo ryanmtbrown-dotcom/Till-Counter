@@ -175,15 +175,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderSettings() {
-        val col = baseColumn("Settings", "Choose the steps used during a count.", scrollable = true)
+        val outer = root()
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("SETTINGS", 18, true, Color.WHITE))
+        shell.addView(header, LinearLayout.LayoutParams(-1, dp(46)))
+
+        val scroll = ScrollView(this).apply { isFillViewport = false }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(8), 0, dp(16))
+        }
+        col.addView(label("COUNT WORKFLOW", 13, true, Color.rgb(214, 183, 107)))
+        col.addView(label("Choose which non-cash steps appear during a count.", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(6)) })
         stages.forEach { name ->
             col.addView(CheckBox(this).apply {
-                text = name; textSize = 17f; setTextColor(Color.WHITE); isChecked = settings.isEnabled(name)
+                text = name; textSize = 16f; setTextColor(Color.WHITE); isChecked = settings.isEnabled(name)
                 buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(214, 183, 107))
                 setOnCheckedChangeListener { _, checked -> settings.setEnabled(name, checked) }
-            }, LinearLayout.LayoutParams(-1, dp(52)))
+            }, LinearLayout.LayoutParams(-1, dp(46)))
         }
-        col.addView(label("BASE TILL AMOUNT", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(20), 0, dp(6)) })
+        col.addView(label("BASE TILL AMOUNT", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(14), 0, dp(5)) })
         val base = EditText(this).apply {
             setText(if (settings.baseTillCents() == 0L) "" else String.format(Locale.US, "%.2f", settings.baseTillCents() / 100.0))
             hint = "Example: 300.00"; textSize = 20f; setTextColor(Color.WHITE); setHintTextColor(Color.rgb(169, 184, 176))
@@ -191,17 +207,26 @@ class MainActivity : AppCompatActivity() {
             showSoftInputOnFocus = false
             setBackgroundColor(Color.rgb(16, 42, 33)); setPadding(dp(16), 0, dp(16), 0)
         }
-        col.addView(base, LinearLayout.LayoutParams(-1, dp(58)))
+        col.addView(base, LinearLayout.LayoutParams(-1, dp(54)))
         col.addView(navButton("SAVE BASE TILL", true) {
             val cents = parseCents(base.text.toString()) ?: 0L
             settings.setBaseTillCents(cents)
-            hideKeyboard(base)
+            base.clearFocus()
             Toast.makeText(this, "Base till saved: " + money(cents), Toast.LENGTH_SHORT).show()
-        }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
-        col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(24), 0, dp(6)) })
+        }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
+        col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(18), 0, dp(5)) })
         col.addView(label("Version " + appVersion(), 14, false, Color.rgb(169, 184, 176)))
-        col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
-        col.addView(navButton("DONE", true) { hideKeyboard(base); settingsOpen = false; input = ""; render() }, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(18) })
+        col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
+        scroll.addView(col, ViewGroup.LayoutParams(-1, -2))
+        shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        shell.addView(navButton("DONE", true) {
+            base.clearFocus()
+            settingsOpen = false
+            input = ""
+            render()
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(8) })
+        outer.addView(shell, FrameLayout.LayoutParams(-1, -1))
+        setContentView(outer)
     }
 
     private fun commitPendingMoney(): Boolean {
