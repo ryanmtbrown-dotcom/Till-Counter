@@ -61,14 +61,11 @@ for n in root.iter('node'):
         raise SystemExit(0)
 raise SystemExit('missing base till EditText')
 PY
-# Dismiss the IME without sending Android BACK, which can leave the Activity
-# on older Android versions. Then prove Till Counter is still foreground.
-adb shell ime list -s | head -n 1 >/dev/null
-adb shell input keyevent 111
-sleep .3
+# Base Till deliberately suppresses the Android soft keyboard. Prove the
+# Activity stayed foreground after entering the value before saving.
 FOREGROUND="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
 echo "$FOREGROUND" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
-  echo "Till Counter lost foreground while dismissing the IME: $FOREGROUND"
+  echo "Till Counter lost foreground during Base Till entry: $FOREGROUND"
   exit 1
 }
 tap_text 'SAVE BASE TILL'
