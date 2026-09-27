@@ -69,6 +69,7 @@ class CompleteWorkflowTest {
             if (!cb.isChecked) cb.click()
         }
         assertTrue("Settings must not depend on Android EditText entry", !device.hasObject(By.clazz("android.widget.EditText")))
+        scrollDown()
         digits("3","00",".","0","0")
         assertText("\$300.00")
         tap("DONE"); assertText("Store Charges")
