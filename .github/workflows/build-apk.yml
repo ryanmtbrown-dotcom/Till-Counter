@@ -2,6 +2,8 @@ name: Build and Prove Till Counter APK
 on:
   push:
     branches: [main, premium-calculator-ui]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
