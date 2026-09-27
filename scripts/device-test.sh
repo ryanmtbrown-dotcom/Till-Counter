@@ -61,10 +61,16 @@ for n in root.iter('node'):
         raise SystemExit(0)
 raise SystemExit('missing base till EditText')
 PY
-# Explicitly dismiss the IME before using Settings actions. On Android 7 the
-# keyboard can otherwise consume/redirect subsequent automation taps.
-adb shell input keyevent 4
+# Dismiss the IME without sending Android BACK, which can leave the Activity
+# on older Android versions. Then prove Till Counter is still foreground.
+adb shell ime list -s | head -n 1 >/dev/null
+adb shell input keyevent 111
 sleep .3
+FOREGROUND="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
+echo "$FOREGROUND" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
+  echo "Till Counter lost foreground while dismissing the IME: $FOREGROUND"
+  exit 1
+}
 tap_text 'SAVE BASE TILL'
 tap_text 'DONE'
 wait_text 'Store Charges'
