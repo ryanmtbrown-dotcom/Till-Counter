@@ -87,22 +87,26 @@ class MainActivity : AppCompatActivity() {
         else -> renderSummary()
     }
 
-    private fun baseColumn(title: String, subtitle: String): LinearLayout {
+    private fun baseColumn(title: String, subtitle: String, scrollable: Boolean = false): LinearLayout {
         val outer = root()
-        val scroll = ScrollView(this).apply { isFillViewport = true }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(20))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        header.addView(label("TILL COUNTER", 16, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 22f }, LinearLayout.LayoutParams(dp(58), dp(50)))
+        header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
         col.addView(header, matchWrap())
-        col.addView(label(title, 30, true, Color.WHITE).apply { setPadding(0, dp(8), 0, 0) }, matchWrap())
-        col.addView(label(subtitle, 15, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(4), 0, dp(18)) }, matchWrap())
-        scroll.addView(col, ViewGroup.LayoutParams(-1, -1))
-        outer.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        col.addView(label(title, 27, true, Color.WHITE).apply { setPadding(0, dp(4), 0, 0) }, matchWrap())
+        col.addView(label(subtitle, 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(8)) }, matchWrap())
+        if (scrollable) {
+            val scroll = ScrollView(this).apply { isFillViewport = true }
+            scroll.addView(col, ViewGroup.LayoutParams(-1, -2))
+            outer.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        } else {
+            outer.addView(col, FrameLayout.LayoutParams(-1, -1))
+        }
         setContentView(outer)
         return col
     }
@@ -171,7 +175,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderSettings() {
-        val col = baseColumn("Settings", "Choose the steps used during a count.")
+        val col = baseColumn("Settings", "Choose the steps used during a count.", scrollable = true)
         stages.forEach { name ->
             col.addView(CheckBox(this).apply {
                 text = name; textSize = 17f; setTextColor(Color.WHITE); isChecked = settings.isEnabled(name)
@@ -248,7 +252,7 @@ class MainActivity : AppCompatActivity() {
         val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
         val baseTill = settings.baseTillCents()
         val drop = grand - baseTill
-        val col = baseColumn("Till Summary", "Copy these totals to your till form.")
+        val col = baseColumn("Till Summary", "Copy these totals to your till form.", scrollable = true)
         stages.forEachIndexed { index, name -> if (settings.isEnabled(name)) col.addView(summaryRow(name, categoryTotals[index])) }
         col.addView(summaryRow("Cash", cashTotal))
         col.addView(LinearLayout(this).apply {
