@@ -114,7 +114,6 @@ echo "$FOREGROUND" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
   echo "Till Counter lost foreground during Base Till entry: $FOREGROUND"
   exit 1
 }
-tap_text 'SAVE BASE TILL'
 tap_text 'DONE'
 wait_text 'Store Charges'
 assert_text '$0.00'
@@ -136,7 +135,16 @@ tap_text '5'; tap_text 'ROLLS: 0'; tap_text '2'; tap_text 'NEXT'
 # Dimes, nickels, pennies.
 tap_text 'NEXT'; tap_text 'NEXT'; assert_text 'Pennies'; tap_text 'FINISH'
 assert_text 'Till Summary'; assert_text '$287.98'; assert_text 'BASE TILL  $300.00'; assert_text 'DROP  -$12.02'
-tap_text '⚙'; assert_text 'SETTINGS'; assert_text 'Version 1.2.0'; assert_text 'CHECK FOR UPDATE'; tap_text 'DONE'
+tap_text '⚙'; assert_text 'SETTINGS'; assert_text 'Version 1.2.0'; assert_text 'CHECK FOR UPDATE'
+dump
+python3 <<'PY'
+import xml.etree.ElementTree as ET
+root=ET.parse('ui.xml').getroot()
+vals=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('class','').endswith('EditText')]
+if '300.00' not in vals:
+    raise SystemExit('Persisted Base Till value missing: '+repr(vals))
+PY
+tap_text 'DONE'
 tap_text 'BACK'; assert_text 'Pennies'
 tap_text 'FINISH'; tap_text 'NEW COUNT'; assert_text 'Store Charges'; assert_text '$0.00'
 adb shell am force-stop "$PKG"; adb shell am start -W -n "$PKG/$ACT" >/dev/null
