@@ -38,10 +38,11 @@ jobs:
           test -s app/src/main/assets/app.css
           test -s app/src/main/assets/splash.png
           test -s app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          grep -q 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
-          grep -q 'https://appassets.androidplatform.net/assets/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
-          ! grep -q 'file:///android_asset' app/src/main/java/com/tillcounter/app/MainActivity.java
-          grep -q 'versionName = "0.2.0"' app/build.gradle.kts
+          grep -Fq 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
+          grep -Fq 'https://appassets.androidplatform.net/assets/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
+          if grep -Fq 'file:///android_asset' app/src/main/java/com/tillcounter/app/MainActivity.java; then echo 'obsolete file asset route found' >&2; exit 1; fi
+          grep -Fq 'versionName = "0.2.0"'
+          echo SOURCE_CONTRACT_PASS app/build.gradle.kts
 
       - name: Build debug APK
         run: gradle --stacktrace :app:assembleDebug
