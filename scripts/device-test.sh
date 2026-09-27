@@ -8,6 +8,22 @@ adb shell am start -W -n "$PKG/$ACT" | tee start.txt
 grep -Fq 'Status: ok' start.txt
 test -n "$(adb shell pidof "$PKG")"
 dump(){ adb shell uiautomator dump /sdcard/ui.xml >/dev/null; adb pull /sdcard/ui.xml ui.xml >/dev/null; }
+assert_app_foreground(){
+  local context="$1"
+  test -n "$(adb shell pidof "$PKG" 2>/dev/null || true)" || {
+    echo "Till Counter process missing after: $context"
+    exit 1
+  }
+  dump
+  python3 - "$PKG" "$context" <<'PY'
+import sys,xml.etree.ElementTree as ET
+pkg,context=sys.argv[1],sys.argv[2]
+root=ET.parse('ui.xml').getroot()
+packages={n.attrib.get('package','') for n in root.iter('node')}
+if pkg not in packages:
+    raise SystemExit("Till Counter is not the visible UI after %s; packages=%r" % (context, sorted(packages)))
+PY
+}
 tap_text(){
   local needle="$1"
   for attempt in $(seq 1 8); do
@@ -43,12 +59,7 @@ sys.exit(1)
 PY
     then
       sleep .3
-      FG="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
-      echo "$FG" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
-        echo "Till Counter lost foreground immediately after tapping: $needle"
-        echo "$FG"
-        exit 1
-      }
+      assert_app_foreground "tapping $needle"
       return 0
     fi
     # Only Settings/Summary are allowed to scroll. Counting screens intentionally
@@ -111,13 +122,9 @@ vals=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('class'
 if '300.00' not in vals:
     raise SystemExit('Base Till field did not contain exact value 300.00: '+repr(vals))
 PY
-# Base Till deliberately suppresses the Android soft keyboard. Prove the
-# Activity stayed foreground after entering the value before saving.
-FOREGROUND="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity\|mFocusedActivity' || true)"
-echo "$FOREGROUND" | grep -Fq 'com.tillcounter.app/.MainActivity' || {
-  echo "Till Counter lost foreground during Base Till entry: $FOREGROUND"
-  exit 1
-}
+# Base Till deliberately suppresses the Android soft keyboard. Prove Till
+# Counter remains the visible UI after entering the value.
+assert_app_foreground "Base Till entry"
 tap_text 'DONE'
 wait_text 'Store Charges'
 assert_text '$0.00'
