@@ -1,0 +1,126 @@
+package com.tillcounter.app
+
+import android.content.Context
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.Until
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class CompleteWorkflowTest {
+    private lateinit var device: UiDevice
+    private val pkg = "com.tillcounter.app"
+
+    @Before fun launchClean() {
+        device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.executeShellCommand("pm clear $pkg")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val intent = context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        waitText("Store Charges", 12_000)
+    }
+
+    private fun waitText(text: String, timeout: Long = 4_000): UiObject2 =
+        device.wait(Until.findObject(By.text(text)), timeout)
+            ?: throw AssertionError("Missing UI text: $text")
+
+    private fun waitDesc(desc: String, timeout: Long = 4_000): UiObject2 =
+        device.wait(Until.findObject(By.desc(desc)), timeout)
+            ?: throw AssertionError("Missing UI description: $desc")
+
+    private fun tap(text: String) {
+        waitText(text).click()
+        device.waitForIdle(2_000)
+        assertForeground()
+    }
+
+    private fun tapDesc(desc: String) {
+        waitDesc(desc).click()
+        device.waitForIdle(2_000)
+        assertForeground()
+    }
+
+    private fun assertForeground() {
+        assertTrue("Till Counter is not foreground", device.hasObject(By.pkg(pkg)))
+    }
+
+    private fun assertText(text: String) { waitText(text) }
+
+    private fun digits(vararg keys: String) = keys.forEach { tap(it) }
+
+    private fun scrollDown() {
+        device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 0.8f)
+        device.waitForIdle(1_000)
+    }
+
+    @Test fun completeWorkflowAndroid16() {
+        // Settings and persistent base till.
+        tapDesc("Settings"); assertText("SETTINGS")
+        listOf("Store Charges","Gift Certificates","Vendor Coupons","Checks","Loans").forEach { name ->
+            val cb = waitText(name)
+            if (!cb.isChecked) cb.click()
+        }
+        val edit = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 3_000)
+            ?: throw AssertionError("Missing Base Till EditText")
+        edit.text = "300.00"
+        assertEquals("300.00", edit.text)
+        tap("DONE"); assertText("Store Charges")
+
+        // Money editing, commit, remove, backspace, BACK and pending NEXT.
+        tap("9"); tap("C"); assertText("$0.00")
+        digits("1",".","0","0"); tap("+"); assertText("$1.00"); tap("Remove"); assertText("$0.00")
+        digits("5","4",".","2","4"); tap("⌫"); tap("3"); assertText("$54.23")
+        tap("NEXT"); assertText("Gift Certificates")
+        digits("1","0",".","0","0"); tap("NEXT"); assertText("Vendor Coupons")
+        tap("BACK"); assertText("Gift Certificates"); assertText("$10.00")
+        tap("NEXT"); assertText("Vendor Coupons")
+        digits("2",".","5","0"); tap("NEXT"); assertText("Checks")
+        digits("3",".","7","5"); tap("NEXT"); assertText("Loans")
+        digits("4",".","0","0"); tap("NEXT: CASH"); assertText("$100 bills")
+
+        // Every cash denomination receives nonzero data.
+        listOf("1","2","3","4","5","6","7").forEach { n -> tap(n); tap("NEXT"); assertText("Cash") }
+        listOf("$1 coins","Half dollars","Quarters","Dimes","Nickels").forEach { label ->
+            assertText(label); tap("1"); tap("ROLLS: 0"); tap("1"); tap("NEXT"); assertText("Cash")
+        }
+        assertText("Pennies")
+        tap("9"); tap("C"); tap("1"); tap("3"); tap("⌫"); tap("2")
+        tap("ROLLS: 0"); tap("1"); tap("FINISH"); assertText("Till Summary")
+
+        // 74.48 non-cash + 398.52 cash = 473.00; base 300 => drop 173.
+        if (!device.hasObject(By.text("$473.00"))) scrollDown()
+        assertText("$473.00"); assertText("BASE TILL  $300.00"); assertText("DROP  $173.00")
+
+        // Summary BACK preserves final denomination state.
+        tap("BACK"); assertText("Pennies"); assertText("LOOSE: 12"); assertText("ROLLS: 1")
+        tap("FINISH"); assertText("Till Summary")
+
+        // Persistent settings survive process restart after NEW COUNT clears transaction state.
+        tap("NEW COUNT"); assertText("Store Charges"); assertText("$0.00")
+        device.executeShellCommand("am force-stop $pkg")
+        val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.startActivity(context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+        assertText("Store Charges")
+        tapDesc("Settings"); assertText("SETTINGS")
+        val persisted = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 3_000)
+            ?: throw AssertionError("Missing Base Till after restart")
+        assertEquals("300.00", persisted.text)
+        listOf("Store Charges","Gift Certificates","Vendor Coupons","Checks","Loans").forEach { name ->
+            assertTrue("$name unexpectedly disabled", waitText(name).isChecked)
+        }
+        tap("DONE"); assertText("Store Charges")
+        assertForeground()
+    }
+}
