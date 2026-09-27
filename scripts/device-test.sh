@@ -151,7 +151,16 @@ tap_text 'ROLLS: 0'; tap_text '1'; tap_text 'FINISH'; wait_text 'Till Summary'
 
 # Expected money stages = 54.23 + 10 + 2.50 + 3.75 + 4 = 74.48.
 # Expected cash = 100 +100 +60 +40 +25 +12 +7 +26 +10.50 +10.25 +5.10 +2.05 +0.62 = 398.52.
-# TOTAL is deliberately cash-only: 398.52; base = 300.00; drop = 98.52.\n# Non-cash stages remain separately visible and must not enter TOTAL/drop.\nassert_text '$398.52'; assert_text 'BASE TILL  $300.00'; assert_text 'DROP  $98.52'
+# TOTAL is deliberately cash-only: 398.52; base = 300.00; drop = 98.52.
+# Non-cash stages remain separately visible and must not enter TOTAL/drop.
+assert_text '$398.52'
+assert_text 'BASE TILL  $300.00'
+assert_text 'DROP  $98.52'
+assert_text '$54.23'
+assert_text '$10.00'
+assert_text '$2.50'
+assert_text '$3.75'
+assert_text '$4.00'
 for name in 'Store Charges' 'Gift Certificates' 'Vendor Coupons' 'Checks' 'Loans' 'Cash'; do assert_text "$name"; done
 
 # Summary BACK returns to final cash denomination with values intact.
