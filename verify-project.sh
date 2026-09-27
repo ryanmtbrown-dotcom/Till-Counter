@@ -6,6 +6,8 @@ test -f app/src/main/res/xml/file_paths.xml
 test -f signing/till-counter.jks
 grep -Fq 'compileSdk = 36' app/build.gradle.kts
 grep -Fq 'targetSdk = 36' app/build.gradle.kts
+grep -Fq 'minSdk = 24' app/build.gradle.kts
+! grep -Fq 'screenOrientation="portrait"' app/src/main/AndroidManifest.xml
 grep -Fq 'version "8.13.2"' build.gradle.kts
 grep -Fq 'version "2.2.21"' build.gradle.kts
 grep -Fq 'androidx.appcompat:appcompat:1.7.1' app/build.gradle.kts
