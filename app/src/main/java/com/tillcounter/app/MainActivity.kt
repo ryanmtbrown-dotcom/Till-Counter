@@ -275,7 +275,7 @@ class MainActivity : AppCompatActivity() {
         val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
         val baseTill = settings.baseTillCents()
         val drop = grand - baseTill
-        val col = baseColumn("Till Summary", "Copy these totals to your till form.", scrollable = true)
+        val col = baseColumn("Till Summary", "Copy these totals to your till form.", scrollable = false)
         stages.forEachIndexed { index, name -> if (settings.isEnabled(name)) col.addView(summaryRow(name, categoryTotals[index])) }
         col.addView(summaryRow("Cash", cashTotal))
         col.addView(LinearLayout(this).apply {
