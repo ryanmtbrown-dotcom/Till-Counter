@@ -275,7 +275,17 @@ class MainActivity : AppCompatActivity() {
         val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
         val baseTill = settings.baseTillCents()
         val drop = grand - baseTill
-        val col = baseColumn("Till Summary", "Copy these totals to your till form.", scrollable = false)
+        val outer = root()
+        val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(10), dp(16), dp(10)) }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
+        shell.addView(header, matchWrap())
+        shell.addView(label("Till Summary", 27, true, Color.WHITE), matchWrap())
+        shell.addView(label("Copy these totals to your till form.", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(6)) }, matchWrap())
+        val scroll = ScrollView(this).apply { isFillViewport = false }
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
         stages.forEachIndexed { index, name -> if (settings.isEnabled(name)) col.addView(summaryRow(name, categoryTotals[index])) }
         col.addView(summaryRow("Cash", cashTotal))
         col.addView(LinearLayout(this).apply {
@@ -294,11 +304,15 @@ class MainActivity : AppCompatActivity() {
             if (cashCounts[it] > 0) col.addView(label("${cashLabels[it]} × ${cashCounts[it]} = ${money(cashCounts[it].toLong() * cashCents[it])}", 16, false, Color.WHITE))
             if (rollCounts[it] > 0) col.addView(label("${cashLabels[it]} rolls × ${rollCounts[it]} (${rollSizes[it]} each) = ${money(rollCounts[it].toLong() * rollSizes[it] * cashCents[it])}", 16, false, Color.WHITE))
         }
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(22), 0, dp(10)) }
+        scroll.addView(col, ViewGroup.LayoutParams(-1, -2))
+        shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, 0) }
         nav.addView(action("BACK") { stage = stages.size; cashIndex = cashLabels.lastIndex; render() }, weightedButton(10))
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
-        col.addView(nav, matchWrap())
-        
+        shell.addView(nav, LinearLayout.LayoutParams(-1, dp(66)))
+        outer.addView(shell, FrameLayout.LayoutParams(-1, -1))
+        setContentView(outer)
+
     }
 
     private fun hideKeyboard(view: View) {
