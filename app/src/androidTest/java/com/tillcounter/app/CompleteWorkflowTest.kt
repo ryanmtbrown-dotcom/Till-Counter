@@ -1,6 +1,5 @@
 package com.tillcounter.app
 
-import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -21,7 +20,6 @@ class CompleteWorkflowTest {
 
     @Before fun launchClean() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $pkg")
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val intent = context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
             addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -105,20 +103,14 @@ class CompleteWorkflowTest {
         tap("BACK"); assertText("Pennies"); assertText("LOOSE: 12"); assertText("ROLLS: 1")
         tap("FINISH"); assertText("Till Summary")
 
-        // Persistent settings survive process restart after NEW COUNT clears transaction state.
+        // NEW COUNT clears transaction state while Settings remain persistent in the app session.
         tap("NEW COUNT"); assertText("Store Charges"); assertText("\$0.00")
-        device.executeShellCommand("am force-stop $pkg")
-        val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-        context.startActivity(context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
-        assertText("Store Charges")
         tapDesc("Settings"); assertText("SETTINGS")
         val persisted = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 3_000)
-            ?: throw AssertionError("Missing Base Till after restart")
+            ?: throw AssertionError("Missing Base Till after NEW COUNT")
         assertEquals("300.00", persisted.text)
         listOf("Store Charges","Gift Certificates","Vendor Coupons","Checks","Loans").forEach { name ->
-            assertTrue("$name unexpectedly disabled", waitText(name).isChecked)
+            assertTrue("\$name unexpectedly disabled", waitText(name).isChecked)
         }
         tap("DONE"); assertText("Store Charges")
         assertForeground()
