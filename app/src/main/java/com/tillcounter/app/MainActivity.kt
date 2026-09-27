@@ -91,27 +91,57 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderMoneyStage() {
         val list = entries[stage]
-        val col = baseColumn(stages[stage], if (stage == 0) "Enter each amount, then tap ADD." else "Add entries, or tap NEXT to skip.")
-        col.addView(totalCard("Running total", money(list.sum())))
+        val col = baseColumn(stages[stage], "Enter an amount. Tap + for another, or NEXT when finished.")
+
+        val total = totalCard("RUNNING TOTAL", money(list.sum()))
+        col.addView(total)
+
         if (list.isNotEmpty()) {
-            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(4), 0, dp(4), dp(12))
+            }
             list.forEachIndexed { index, cents ->
                 box.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    addView(label("${index + 1}. ${money(cents)}", 17, false, Color.WHITE), LinearLayout.LayoutParams(0, dp(44), 1f))
-                    addView(action("REMOVE") { list.removeAt(index); render() }, LinearLayout.LayoutParams(dp(104), dp(44)))
+                    addView(label("${index + 1}.  ${money(cents)}", 16, false, Color.rgb(226, 231, 228)), LinearLayout.LayoutParams(0, dp(42), 1f))
+                    addView(textAction("Remove") { list.removeAt(index); render() }, LinearLayout.LayoutParams(dp(92), dp(42)))
                 })
             }
             col.addView(box, matchWrap())
         }
+
         col.addView(display(if (input.isBlank()) "$0.00" else "$$input"))
         moneyPad(col)
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10), 0, 0) }
-        nav.addView(action("BACK") { if (stage > 0) { stage--; input = ""; render() } }, weightedButton(8))
-        nav.addView(action("ADD") { parseCents(input)?.takeIf { it > 0 }?.let { list.add(it); input = ""; render() } }, weightedButton(8))
-        nav.addView(action("NEXT") { stage++; input = ""; render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
+
+        val divider = View(this).apply { setBackgroundColor(Color.rgb(69, 72, 65)) }
+        col.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
+            topMargin = dp(18); bottomMargin = dp(14)
+        })
+
+        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        nav.addView(navButton("BACK", false) {
+            if (stage > 0) {
+                stage--
+                input = ""
+                render()
+            }
+        }, weightedButton(10))
+        nav.addView(navButton(if (stage == stages.lastIndex) "NEXT: CASH" else "NEXT", true) {
+            commitPendingMoney()
+            stage++
+            input = ""
+            render()
+        }, LinearLayout.LayoutParams(0, dp(60), 1.35f))
         col.addView(nav, matchWrap())
+    }
+
+    private fun commitPendingMoney(): Boolean {
+        val cents = parseCents(input) ?: return false
+        if (cents > 0) entries[stage].add(cents)
+        input = ""
+        return cents > 0
     }
 
     private fun renderCashStage() {
@@ -162,11 +192,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun moneyPad(col: LinearLayout) {
-        listOf(listOf("7", "8", "9"), listOf("4", "5", "6"), listOf("1", "2", "3"), listOf("C", "0", "⌫"), listOf("00", ".", "")).forEach { keys ->
+        val rows = listOf(
+            listOf("7", "8", "9", "⌫"),
+            listOf("4", "5", "6", "C"),
+            listOf("1", "2", "3", "+"),
+            listOf("00", "0", ".", "+")
+        )
+        rows.forEachIndexed { rowIndex, keys ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            keys.forEach { key ->
-                if (key.isBlank()) row.addView(Space(this), LinearLayout.LayoutParams(0, dp(56), 1f))
-                else row.addView(action(key) { moneyKey(key) }, keyParams())
+            keys.forEachIndexed { keyIndex, key ->
+                val isPlus = key == "+"
+                if (isPlus && rowIndex == 3) {
+                    row.addView(Space(this), keyParams())
+                } else {
+                    val button = when {
+                        isPlus -> plusButton { commitPendingMoney(); render() }
+                        key == "C" || key == "⌫" -> editKey(key) { moneyKey(key) }
+                        else -> numberKey(key) { moneyKey(key) }
+                    }
+                    row.addView(button, keyParams())
+                }
             }
             col.addView(row, matchWrap())
         }
@@ -261,7 +306,53 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun action(name: String, click: () -> Unit) = Button(this).apply {
-        text = name; textSize = 15f; isAllCaps = false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(25, 67, 52)); setOnClickListener { click() }
+        text = name; textSize = 15f; isAllCaps = false
+        setTextColor(Color.WHITE)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(30, 57, 48))
+        setOnClickListener { click() }
+    }
+
+    private fun numberKey(name: String, click: () -> Unit) = Button(this).apply {
+        text = name; textSize = 22f; isAllCaps = false
+        setTextColor(Color.WHITE)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(29, 38, 35))
+        setOnClickListener { click() }
+    }
+
+    private fun editKey(name: String, click: () -> Unit) = Button(this).apply {
+        text = name; textSize = 18f; isAllCaps = false
+        setTextColor(Color.rgb(221, 225, 222))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(49, 57, 53))
+        setOnClickListener { click() }
+    }
+
+    private fun plusButton(click: () -> Unit) = Button(this).apply {
+        text = "+"; textSize = 28f; isAllCaps = false
+        setTextColor(Color.rgb(7, 26, 20))
+        setTypeface(typeface, Typeface.BOLD)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(214, 183, 107))
+        contentDescription = "Add amount"
+        setOnClickListener { click() }
+    }
+
+    private fun navButton(name: String, primary: Boolean, click: () -> Unit) = Button(this).apply {
+        text = name; textSize = 15f; isAllCaps = false
+        setTypeface(typeface, Typeface.BOLD)
+        if (primary) {
+            setTextColor(Color.rgb(7, 26, 20))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(214, 183, 107))
+        } else {
+            setTextColor(Color.rgb(224, 229, 226))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(42, 49, 46))
+        }
+        setOnClickListener { click() }
+    }
+
+    private fun textAction(name: String, click: () -> Unit) = Button(this).apply {
+        text = name; textSize = 13f; isAllCaps = false
+        setTextColor(Color.rgb(214, 183, 107))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(7, 26, 20))
+        setOnClickListener { click() }
     }
     private fun label(value: String, size: Int, bold: Boolean, color: Int) = TextView(this).apply {
         text = value; textSize = size.toFloat(); setTextColor(color); if (bold) setTypeface(typeface, Typeface.BOLD)
