@@ -3,6 +3,7 @@ package com.tillcounter.app;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.JavascriptInterface;
@@ -72,6 +73,12 @@ public final class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return loader.shouldInterceptRequest(request.getUrl());
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                view.postDelayed(() -> view.evaluateJavascript(
+                    "(function(){var s=document.getElementById('splash'),a=document.getElementById('app'),t=document.getElementById('title'),r=document.getElementById('running'),d=document.getElementById('display');return !!(s&&s.classList.contains('hidden')&&a&&!a.classList.contains('hidden')&&t&&t.textContent==='Store Charges'&&r&&r.textContent==='$0.00'&&d&&d.textContent==='$0.00')?'READY':'NOT_READY';})()",
+                    value -> Log.i("TillCounterProof", "APP_STATE=" + value)), 7200L);
             }
         });
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
