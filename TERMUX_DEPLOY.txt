@@ -1,0 +1,5 @@
+After the GitHub proof workflow succeeds:
+
+gh release download v1.0.0 --repo ryanmtbrown-dotcom/Till-Counter --pattern 'Till-Counter-v1.0.0.apk' --dir ~/storage/downloads --clobber
+
+APK location: ~/storage/downloads/Till-Counter-v1.0.0.apk

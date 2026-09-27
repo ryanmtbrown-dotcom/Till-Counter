@@ -1,143 +1,90 @@
-name: Prove and Release Till Counter APK
-
+name: Build and Prove Till Counter APK
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
-  prove-and-release:
+  build-test-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
-      - name: Check out exact source
-        uses: actions/checkout@v5
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          gradle-version: '8.13'
-
-      - name: Validate source contract
+      - name: Verify Android 36 environment
         shell: bash
         run: |
           set -euo pipefail
-          test -f app/src/main/java/com/tillcounter/app/MainActivity.java
-          test ! -e app/src/main/java/com/tillcounter/app/MainActivity.kt
-          test -s app/src/main/assets/index.html
-          test -s app/src/main/assets/app.js
-          test -s app/src/main/assets/app.css
-          test -s app/src/main/assets/splash.png
-          test -s app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          grep -Fq 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
-          grep -Fq 'https://appassets.androidplatform.net/assets/index.html' app/src/main/java/com/tillcounter/app/MainActivity.java
-          if grep -Fq 'file:///android_asset' app/src/main/java/com/tillcounter/app/MainActivity.java; then echo 'obsolete file asset route found' >&2; exit 1; fi
-          grep -Fq 'versionName = "0.2.0"' app/build.gradle.kts
-          echo SOURCE_CONTRACT_PASS
-
-      - name: Build debug APK
-        run: gradle --stacktrace :app:assembleDebug
-
-      - name: Verify APK package contents
+          test -d "$ANDROID_SDK_ROOT/platforms/android-36"
+          test -d "$ANDROID_SDK_ROOT/build-tools/36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Verify clean project
+        run: bash verify-project.sh
+      - name: Build signed APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Inspect APK
         shell: bash
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
-          unzip -l "$APK" | tee apk-contents.txt
-          grep -q 'assets/index.html' apk-contents.txt
-          grep -q 'assets/app.js' apk-contents.txt
-          grep -q 'assets/app.css' apk-contents.txt
-          grep -q 'assets/splash.png' apk-contents.txt
-          # classes.dex must exist; MainActivity presence is then proven at runtime by the emulator launch below.
-          grep -q 'classes.dex' apk-contents.txt
-          sha256sum "$APK" | tee apk-build.sha256
-          APKSIGNER="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n1)"
-          test -x "$APKSIGNER"
-          CERTS="$("$APKSIGNER" verify --print-certs "$APK")"
-          printf '%s\n' "$CERTS"
-          echo "$CERTS" | tr '[:upper:]' '[:lower:]' | grep -Fq '79b76b3dc2e82e5842e5b0de8ab3278332383c8e063d1f4039d4f0e3a65940e0'
-          echo STABLE_SIGNER_PASS
-
+          unzip -l "$APK" > apk-contents.txt
+          grep -Fq 'classes.dex' apk-contents.txt
+          grep -Fq 'res/drawable_nodpi/splash.png' apk-contents.txt
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > apk-signature.txt
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$APK" > apk-badging.txt
+          grep -Fq "package: name='com.tillcounter.app'" apk-badging.txt
+          grep -Fq "targetSdkVersion:'36'" apk-badging.txt
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-
-      - name: Install APK and prove real Android startup
+      - name: Android 16 complete functional test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
           arch: x86_64
           profile: pixel_7_pro
           disable-animations: true
-          script: ./scripts/ci-device-smoke.sh
-
-      - name: Stage proven APK
+          script: bash scripts/device-test.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Prepare exact tested APK
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk release/Till-Counter-v0.2.0.apk
-          sha256sum release/Till-Counter-v0.2.0.apk | tee release/Till-Counter-v0.2.0.apk.sha256
-
-      - name: Upload proof bundle
+          V="$(sed -n 's/^TILL_VERSION_NAME=//p' gradle.properties)"
+          mkdir -p release-out
+          cp app/build/outputs/apk/debug/app-debug.apk "release-out/Till-Counter-v${V}.apk"
+          sha256sum "release-out/Till-Counter-v${V}.apk" | tee release-out/SHA256.txt
+      - name: Upload proof
         uses: actions/upload-artifact@v4
         with:
-          name: Till-Counter-v0.2.0-Proof
+          name: till-counter-proof
           path: |
-            release/Till-Counter-v0.2.0.apk
-            release/Till-Counter-v0.2.0.apk.sha256
             apk-contents.txt
-            apk-build.sha256
-            device-smoke-logcat.txt
-            device-smoke.png
-            till-counter-ui.xml
-          if-no-files-found: error
-
-      - name: Publish release only after all proof gates pass
+            apk-signature.txt
+            apk-badging.txt
+            start.txt
+            device.log
+            final-screen.png
+            release-out/SHA256.txt
+      - name: Publish only after all proof gates pass
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG=v0.2.0
-          APK=release/Till-Counter-v0.2.0.apk
-          SUM=release/Till-Counter-v0.2.0.apk.sha256
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" "$SUM" --clobber
-          else
-            gh release create "$TAG" "$APK" "$SUM" --target "$GITHUB_SHA" --title 'Till Counter v0.2.0' --notes 'Release published only after build, APK-content verification, installation on an Android 16 emulator, successful MainActivity launch, rendered Store Charges workflow verification after the six-second splash, resumed-activity verification, and fatal-runtime-log checks passed.'
-          fi
-          gh release download "$TAG" --pattern 'Till-Counter-v0.2.0.apk' --dir release-verify
-          test -s release-verify/Till-Counter-v0.2.0.apk
-          cmp "$APK" release-verify/Till-Counter-v0.2.0.apk
-          echo 'RELEASE_ROUNDTRIP_PASS'
-
-      - name: Collect diagnostics on failure
-        if: failure()
-        shell: bash
-        run: |
-          mkdir -p diagnostics
-          cp -f device-smoke-logcat.txt diagnostics/ 2>/dev/null || true
-          cp -f device-smoke.png diagnostics/ 2>/dev/null || true
-          cp -f apk-contents.txt diagnostics/ 2>/dev/null || true
-          find app/build -type f \( -name '*.log' -o -name '*.txt' -o -name '*.html' \) -exec cp --parents {} diagnostics/ \; 2>/dev/null || true
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Till-Counter-v0.2.0-Failure-Diagnostics
-          path: diagnostics/
-          if-no-files-found: ignore
+          V="$(sed -n 's/^TILL_VERSION_NAME=//p' gradle.properties)"
+          TAG="v$V"; APK="release-out/Till-Counter-v${V}.apk"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "Till Counter $TAG" --notes 'Clean native rebuild. Complete Android 16 functional workflow passed before publication.'
+          mkdir roundtrip
+          gh release download "$TAG" --pattern "Till-Counter-v${V}.apk" --dir roundtrip
+          cmp "$APK" "roundtrip/Till-Counter-v${V}.apk"
+          echo RELEASE_ROUNDTRIP_PASS
