@@ -147,6 +147,7 @@ done
 # Pennies: exercise C/backspace in count mode, loose=12, rolls=1.
 wait_text 'Pennies'; tap_text '9'; tap_text 'C'; tap_text '1'; tap_text '3'; tap_text '⌫'; tap_text '2'
 tap_text 'ROLLS: 0'; tap_text '1'; tap_text 'FINISH'; wait_text 'Till Summary'
+echo 'PHASE_SUMMARY_PASS'
 
 # Expected money stages = 54.23 + 10 + 2.50 + 3.75 + 4 = 74.48.
 # Expected cash = 100 +100 +60 +40 +25 +12 +7 +26 +10.50 +10.25 +5.10 +2.05 +0.62 = 398.52.
@@ -169,6 +170,8 @@ tap_text 'FINISH'; wait_text 'Till Summary'
 # SETTINGS persistence survives force-stop/process restart.
 tap_text 'Settings'; wait_text 'SETTINGS'
 tap_text 'Base till amount'; assert_text '$300.00'
+echo 'PHASE_SETTINGS_PERSISTENCE_PASS'
+tap_text 'DONE'; wait_text 'Till Summary'
 
 # NEW COUNT clears transactional state but not persistent Settings.
 tap_text 'NEW COUNT'; wait_text 'Store Charges'; assert_text '$0.00'
