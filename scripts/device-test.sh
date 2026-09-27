@@ -99,7 +99,7 @@ wait_text(){
 }
 wait_text 'Store Charges'; assert_text '$0.00'
 # Settings contract: disable Vendor Coupons and set a persistent $300 base till.
-tap_text 'Settings'; assert_text 'SETTINGS'; assert_text 'Vendor Coupons'; assert_text 'CHECK FOR UPDATE'
+tap_text 'Settings'; wait_text 'SETTINGS'; assert_text 'Vendor Coupons'; assert_text 'CHECK FOR UPDATE'
 tap_text 'Vendor Coupons'
 # EditText is the only editable field on Settings; inject baseline through focused field.
 dump
@@ -146,7 +146,7 @@ tap_text '5'; tap_text 'ROLLS: 0'; tap_text '2'; tap_text 'NEXT'
 # Dimes, nickels, pennies.
 tap_text 'NEXT'; tap_text 'NEXT'; assert_text 'Pennies'; tap_text 'FINISH'
 assert_text 'Till Summary'; assert_text '$287.98'; assert_text 'BASE TILL  $300.00'; assert_text 'LOAN NEEDED  $12.02'
-tap_text 'Settings'; assert_text 'SETTINGS'; assert_text 'Version 1.2.0'; assert_text 'CHECK FOR UPDATE'
+tap_text 'Settings'; wait_text 'SETTINGS'; assert_text 'Version 1.2.0'; assert_text 'CHECK FOR UPDATE'
 dump
 python3 <<'PY'
 import xml.etree.ElementTree as ET
