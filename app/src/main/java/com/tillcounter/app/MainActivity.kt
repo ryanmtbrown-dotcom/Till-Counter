@@ -238,20 +238,20 @@ class MainActivity : AppCompatActivity() {
         val count = cashCounts[cashIndex]
         val col = baseColumn("Cash", "Enter the number of each denomination.")
         col.addView(label("${cashIndex + 1} of ${cashLabels.size}", 14, true, Color.rgb(214, 183, 107)))
-        col.addView(label(cashLabels[cashIndex], 28, true, Color.WHITE).apply { setPadding(0, dp(16), 0, dp(6)) })
+        col.addView(label(cashLabels[cashIndex], 24, true, Color.WHITE).apply { setPadding(0, dp(6), 0, dp(2)) })
         val isCoin = rollSizes[cashIndex] > 0
         val rolls = rollCounts[cashIndex]
         val totalValue = count.toLong() * cashCents[cashIndex] + rolls.toLong() * rollSizes[cashIndex] * cashCents[cashIndex]
         if (isCoin) {
-            val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, dp(8)) }
+            val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(2), 0, dp(2)) }
             modes.addView(navButton("LOOSE: " + count, !editingRolls) { commitCash(); editingRolls = false; input = ""; render() }, weightedButton(8))
-            modes.addView(navButton("ROLLS: " + rolls, editingRolls) { commitCash(); editingRolls = true; input = ""; render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
+            modes.addView(navButton("ROLLS: " + rolls, editingRolls) { commitCash(); editingRolls = true; input = ""; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
             col.addView(modes, matchWrap())
             col.addView(label("1 roll = " + rollSizes[cashIndex] + " coins", 14, false, Color.rgb(169, 184, 176)))
         } else {
             col.addView(label("Count: $count", 24, true, Color.WHITE))
         }
-        col.addView(label("Value: " + money(totalValue), 18, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(14)) })
+        col.addView(label("Value: " + money(totalValue), 17, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(4)) })
         val shownCount = if (editingRolls && isCoin) rolls else count
         col.addView(display(if (input.isBlank()) shownCount.toString() else input))
         countPad(col)
@@ -420,7 +420,11 @@ class MainActivity : AppCompatActivity() {
     private fun countPad(col: LinearLayout) {
         listOf(listOf("7", "8", "9"), listOf("4", "5", "6"), listOf("1", "2", "3"), listOf("C", "0", "⌫")).forEach { keys ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            keys.forEach { key -> row.addView(action(key) { countKey(key) }, keyParams()) }
+            keys.forEach { key ->
+                row.addView(action(key) { countKey(key) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                    setMargins(dp(4), dp(2), dp(4), dp(2))
+                })
+            }
             col.addView(row, matchWrap())
         }
     }
