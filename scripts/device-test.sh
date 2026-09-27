@@ -103,23 +103,20 @@ wait_text 'Store Charges'; assert_text '$0.00'
 tap_text 'Settings'; wait_text 'SETTINGS'
 for name in 'Store Charges' 'Gift Certificates' 'Vendor Coupons' 'Checks' 'Loans'; do assert_text "$name"; done
 assert_text 'CHECK FOR UPDATE'
-# Base Till is the only EditText.
+# Base Till uses only the in-app keypad; no Android EditText/soft keyboard is required.
 dump
-python3 - <<'PY'
-import re,subprocess,xml.etree.ElementTree as ET
-root=ET.parse('ui.xml').getroot()
-for n in root.iter('node'):
-    if n.attrib.get('class','').endswith('EditText'):
-        m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
-        subprocess.check_call(['adb','shell','input','tap',str((int(m[1])+int(m[3]))//2),str((int(m[2])+int(m[4]))//2)])
-        subprocess.check_call(['adb','shell','input','text','300.00'])
-        raise SystemExit(0)
-raise SystemExit('missing base till EditText')
-PY
+if grep -Fq 'class="android.widget.EditText"' ui.xml; then echo 'Settings unexpectedly exposes Android EditText'; exit 1; fi
+for k in 3 00 . 0 0; do tap_text "$k"; done
+assert_text '$300.00'
 tap_text 'DONE'; wait_text 'Store Charges'
 
 # MONEY EDITING: C, backspace, decimal, +, Remove, BACK/NEXT and pending-NEXT commit.
 tap_text '9'; tap_text 'C'; assert_text '$0.00'
+# Overflow the local history; NEXT must remain in the fixed viewport.
+for amount in 1 2 3 4 5; do tap_text "$amount"; tap_text '+'; done
+assert_text 'SUBTOTAL'; assert_text '$15.00'
+tap_text 'NEXT'; wait_text 'Gift Certificates'; tap_text 'BACK'; wait_text 'Store Charges'
+for i in 1 2 3 4 5; do tap_text 'Remove'; done
 for k in 1 . 0 0; do tap_text "$k"; done
 tap_text '+'; wait_text 'Store Charges'; assert_text '$1.00'; assert_text 'Remove'
 tap_text 'Remove'; wait_text 'Store Charges'; assert_text '$0.00'
@@ -169,14 +166,7 @@ tap_text 'FINISH'; wait_text 'Till Summary'
 
 # SETTINGS persistence survives force-stop/process restart.
 tap_text 'Settings'; wait_text 'SETTINGS'; assert_text 'Version 1.2.0'
-dump
-python3 <<'PY'
-import xml.etree.ElementTree as ET
-root=ET.parse('ui.xml').getroot()
-vals=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('class','').endswith('EditText')]
-if '300.00' not in vals: raise SystemExit('Persisted Base Till value missing: '+repr(vals))
-PY
-tap_text 'DONE'; wait_text 'Till Summary'
+assert_text '$300.00'
 
 # NEW COUNT clears transactional state but not persistent Settings.
 tap_text 'NEW COUNT'; wait_text 'Store Charges'; assert_text '$0.00'
@@ -185,16 +175,15 @@ adb shell am start -W -n "$PKG/$ACT" >/dev/null
 wait_text 'Store Charges'; assert_text '$0.00'
 tap_text 'Settings'; wait_text 'SETTINGS'
 dump
+assert_text '$300.00'
+dump
 python3 <<'PY'
 import xml.etree.ElementTree as ET
 root=ET.parse('ui.xml').getroot()
-vals=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('class','').endswith('EditText')]
-if '300.00' not in vals: raise SystemExit('Base Till did not survive process restart: '+repr(vals))
 checks={n.attrib.get('text',''):n.attrib.get('checked') for n in root.iter('node') if n.attrib.get('class','').endswith('CheckBox')}
 bad={k:v for k,v in checks.items() if v!='true'}
 if bad: raise SystemExit('Workflow settings not persisted/enabled: '+repr(bad))
 PY
-tap_text 'DONE'; wait_text 'Store Charges'
 
 adb logcat -d -v threadtime > device.log
 if grep -E 'FATAL EXCEPTION|AndroidRuntime.*Process: com\.tillcounter\.app' device.log; then cat device.log; exit 1; fi
