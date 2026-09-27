@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var stage = 0
     private var cashIndex = 0
     private var input = ""
+    private var settingsBaseInput = ""
     private var editingRolls = false
     private var splashDone = false
 
@@ -104,7 +105,7 @@ class MainActivity : AppCompatActivity() {
         }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
+        header.addView(navButton("⚙", false) { openSettings() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
         col.addView(header, matchWrap())
         col.addView(label(title, 27, true, Color.WHITE).apply { setPadding(0, dp(4), 0, 0) }, matchWrap())
         col.addView(label(subtitle, 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(8)) }, matchWrap())
@@ -127,48 +128,46 @@ class MainActivity : AppCompatActivity() {
         }
         val list = entries[stage]
         val col = baseColumn(stages[stage], "Enter an amount. Tap + for another, or NEXT when finished.")
-
-        val total = totalCard("RUNNING TOTAL", money(list.sum()))
-        col.addView(total)
-
-        if (list.isNotEmpty()) {
-            val box = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(4), 0, dp(4), dp(12))
-            }
+        val history = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(11, 34, 27))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+        val scroll = ScrollView(this).apply { isFillViewport = false; isVerticalScrollBarEnabled = true; contentDescription = "Entered amounts" }
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        if (list.isEmpty()) {
+            rows.addView(label("No amounts added yet", 14, false, Color.rgb(169, 184, 176)).apply { gravity = Gravity.CENTER_VERTICAL }, LinearLayout.LayoutParams(-1, dp(40)))
+        } else {
             list.forEachIndexed { index, cents ->
-                box.addView(LinearLayout(this).apply {
+                rows.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    addView(label("${index + 1}.  ${money(cents)}", 16, false, Color.rgb(226, 231, 228)), LinearLayout.LayoutParams(0, dp(42), 1f))
-                    addView(textAction("Remove") { list.removeAt(index); render() }, LinearLayout.LayoutParams(dp(92), dp(42)))
+                    addView(label("${index + 1}.  ${money(cents)}", 15, false, Color.rgb(226, 231, 228)), LinearLayout.LayoutParams(0, dp(40), 1f))
+                    addView(textAction("Remove") { list.removeAt(index); render() }, LinearLayout.LayoutParams(dp(84), dp(40)))
                 })
             }
-            col.addView(box, matchWrap())
         }
-
+        scroll.addView(rows, ViewGroup.LayoutParams(-1, -2))
+        history.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        history.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(label("SUBTOTAL", 13, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, dp(38), 1f))
+            addView(label(money(list.sum()), 18, true, Color.WHITE).apply { gravity = Gravity.CENTER_VERTICAL })
+        }, LinearLayout.LayoutParams(-1, dp(38)))
+        col.addView(history, LinearLayout.LayoutParams(-1, dp(128)).apply { bottomMargin = dp(8) })
+        if (list.isNotEmpty()) scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
         col.addView(display(if (input.isBlank()) "$0.00" else "$$input"))
         moneyPad(col)
-
         val divider = View(this).apply { setBackgroundColor(Color.rgb(69, 72, 65)) }
-        col.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
-            topMargin = dp(18); bottomMargin = dp(14)
-        })
-
+        col.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); bottomMargin = dp(6) })
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         nav.addView(navButton("BACK", false) {
-            if (stage > 0) {
-                stage = previousEnabledStage(stage) ?: 0
-                input = ""
-                render()
-            }
+            if (stage > 0) { stage = previousEnabledStage(stage) ?: 0; input = ""; render() }
         }, weightedButton(10))
         nav.addView(navButton(if (stage == stages.lastIndex) "NEXT: CASH" else "NEXT", true) {
-            commitPendingMoney()
-            stage = nextEnabledStage(stage)
-            input = ""
-            render()
-        }, LinearLayout.LayoutParams(0, dp(60), 1.35f))
+            commitPendingMoney(); stage = nextEnabledStage(stage); input = ""; render()
+        }, LinearLayout.LayoutParams(0, dp(56), 1.35f))
         col.addView(nav, matchWrap())
     }
 
@@ -182,22 +181,22 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
+    private fun openSettings() {
+        settingsOpen = true
+        input = ""
+        settingsBaseInput = if (settings.baseTillCents() == 0L) "" else String.format(Locale.US, "%.2f", settings.baseTillCents() / 100.0)
+        render()
+    }
+
     private fun renderSettings() {
         val outer = root()
-        val shell = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-        }
+        val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(12)) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("SETTINGS", 18, true, Color.WHITE))
         shell.addView(header, LinearLayout.LayoutParams(-1, dp(46)))
-
         val scroll = ScrollView(this).apply { isFillViewport = false }
-        val col = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(8), 0, dp(16))
-        }
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(16)) }
         col.addView(label("COUNT WORKFLOW", 13, true, Color.rgb(214, 183, 107)))
         col.addView(label("Choose which non-cash steps appear during a count.", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(6)) })
         stages.forEach { name ->
@@ -208,14 +207,9 @@ class MainActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(-1, dp(46)))
         }
         col.addView(label("BASE TILL AMOUNT", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(14), 0, dp(5)) })
-        val base = EditText(this).apply {
-            setText(if (settings.baseTillCents() == 0L) "" else String.format(Locale.US, "%.2f", settings.baseTillCents() / 100.0))
-            hint = "Example: 300.00"; textSize = 20f; setTextColor(Color.WHITE); setHintTextColor(Color.rgb(169, 184, 176))
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            showSoftInputOnFocus = false
-            setBackgroundColor(Color.rgb(16, 42, 33)); setPadding(dp(16), 0, dp(16), 0)
-        }
-        col.addView(base, LinearLayout.LayoutParams(-1, dp(54)))
+        col.addView(label("Amount kept in the till after the drop.", 13, false, Color.rgb(169, 184, 176)))
+        col.addView(display(if (settingsBaseInput.isBlank()) "$0.00" else "$$settingsBaseInput").apply { contentDescription = "Base till amount" })
+        settingsMoneyPad(col)
         col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(18), 0, dp(5)) })
         col.addView(label("Version " + appVersion(), 14, false, Color.rgb(169, 184, 176)))
         col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(6) })
@@ -223,16 +217,40 @@ class MainActivity : AppCompatActivity() {
         shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val doneWrap = FrameLayout(this).apply { setPadding(0, dp(8), 0, dp(12)) }
         doneWrap.addView(navButton("DONE", true) {
-            val cents = parseCents(base.text.toString()) ?: 0L
-            settings.setBaseTillCents(cents)
-            base.clearFocus()
-            settingsOpen = false
-            input = ""
-            render()
+            settings.setBaseTillCents(parseCents(settingsBaseInput) ?: 0L)
+            settingsOpen = false; settingsBaseInput = ""; input = ""; render()
         }, FrameLayout.LayoutParams(-1, dp(56)))
         shell.addView(doneWrap, LinearLayout.LayoutParams(-1, dp(76)))
         outer.addView(shell, FrameLayout.LayoutParams(-1, -1))
         setContentView(outer)
+    }
+
+    private fun settingsMoneyPad(col: LinearLayout) {
+        listOf(listOf("7", "8", "9", "⌫"), listOf("4", "5", "6", "C"), listOf("1", "2", "3", "00"), listOf("0", ".")).forEach { keys ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            keys.forEach { key ->
+                val button = when (key) {
+                    "C", "⌫" -> editKey(key) { settingsMoneyKey(key) }
+                    else -> numberKey(key) { settingsMoneyKey(key) }
+                }
+                row.addView(button, keyParams())
+            }
+            repeat(4 - keys.size) { row.addView(Space(this), keyParams()) }
+            col.addView(row, matchWrap())
+        }
+    }
+
+    private fun settingsMoneyKey(key: String) {
+        when (key) {
+            "C" -> settingsBaseInput = ""
+            "⌫" -> settingsBaseInput = settingsBaseInput.dropLast(1)
+            "." -> if (!settingsBaseInput.contains('.')) settingsBaseInput = if (settingsBaseInput.isBlank()) "0." else "$settingsBaseInput."
+            else -> {
+                if (settingsBaseInput.contains('.') && settingsBaseInput.substringAfter('.').length >= 2) return
+                if (settingsBaseInput.length < 9) settingsBaseInput += key
+            }
+        }
+        render()
     }
 
     private fun commitPendingMoney(): Boolean {
@@ -287,7 +305,7 @@ class MainActivity : AppCompatActivity() {
         val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(10), dp(16), dp(10)) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(navButton("⚙", false) { settingsOpen = true; input = ""; render() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
+        header.addView(navButton("⚙", false) { openSettings() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
         shell.addView(header, matchWrap())
         shell.addView(label("Till Summary", 27, true, Color.WHITE), matchWrap())
         shell.addView(label("Copy these totals to your till form.", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(6)) }, matchWrap())
