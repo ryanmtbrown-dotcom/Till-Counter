@@ -31,6 +31,8 @@ class MainActivity : AppCompatActivity() {
     private val cashLabels = listOf("$100 bills", "$50 bills", "$20 bills", "$10 bills", "$5 bills", "$2 bills", "$1 bills", "$1 coins", "Half dollars", "Quarters", "Dimes", "Nickels", "Pennies")
     private val cashCents = longArrayOf(10000, 5000, 2000, 1000, 500, 200, 100, 100, 50, 25, 10, 5, 1)
     private val cashCounts = IntArray(cashLabels.size)
+    private val rollSizes = intArrayOf(0, 0, 0, 0, 0, 0, 0, 25, 20, 40, 50, 40, 50)
+    private val rollCounts = IntArray(cashLabels.size)
     private val currency = NumberFormat.getCurrencyInstance(Locale.US)
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var settings: TillSettings
@@ -38,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var stage = 0
     private var cashIndex = 0
     private var input = ""
+    private var editingRolls = false
     private var splashDone = false
 
     override fun onCreate(state: Bundle?) {
@@ -207,27 +210,39 @@ class MainActivity : AppCompatActivity() {
         val col = baseColumn("Cash", "Enter the number of each denomination.")
         col.addView(label("${cashIndex + 1} of ${cashLabels.size}", 14, true, Color.rgb(214, 183, 107)))
         col.addView(label(cashLabels[cashIndex], 28, true, Color.WHITE).apply { setPadding(0, dp(16), 0, dp(6)) })
-        col.addView(label("Count: $count", 24, true, Color.WHITE))
-        col.addView(label("Value: ${money(count.toLong() * cashCents[cashIndex])}", 18, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(14)) })
-        col.addView(display(if (input.isBlank()) count.toString() else input))
+        val isCoin = rollSizes[cashIndex] > 0
+        val rolls = rollCounts[cashIndex]
+        val totalValue = count.toLong() * cashCents[cashIndex] + rolls.toLong() * rollSizes[cashIndex] * cashCents[cashIndex]
+        if (isCoin) {
+            val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, dp(8)) }
+            modes.addView(navButton("LOOSE: " + count, !editingRolls) { commitCash(); editingRolls = false; input = ""; render() }, weightedButton(8))
+            modes.addView(navButton("ROLLS: " + rolls, editingRolls) { commitCash(); editingRolls = true; input = ""; render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
+            col.addView(modes, matchWrap())
+            col.addView(label("1 roll = " + rollSizes[cashIndex] + " coins", 14, false, Color.rgb(169, 184, 176)))
+        } else {
+            col.addView(label("Count: $count", 24, true, Color.WHITE))
+        }
+        col.addView(label("Value: " + money(totalValue), 18, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(14)) })
+        val shownCount = if (editingRolls && isCoin) rolls else count
+        col.addView(display(if (input.isBlank()) shownCount.toString() else input))
         countPad(col)
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10), 0, 0) }
         nav.addView(action("BACK") {
             commitCash()
             if (cashIndex > 0) cashIndex-- else stage = stages.size - 1
-            input = ""; render()
+            editingRolls = false; input = ""; render()
         }, weightedButton(10))
         nav.addView(action(if (cashIndex == cashLabels.lastIndex) "FINISH" else "NEXT") {
             commitCash()
             if (cashIndex == cashLabels.lastIndex) stage = stages.size + 1 else cashIndex++
-            input = ""; render()
+            editingRolls = false; input = ""; render()
         }, LinearLayout.LayoutParams(0, dp(58), 1f))
         col.addView(nav, matchWrap())
     }
 
     private fun renderSummary() {
         val categoryTotals = entries.map { it.sum() }
-        val cashTotal = cashCounts.indices.sumOf { cashCounts[it].toLong() * cashCents[it] }
+        val cashTotal = cashCounts.indices.sumOf { cashCounts[it].toLong() * cashCents[it] + rollCounts[it].toLong() * rollSizes[it] * cashCents[it] }
         val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
         val baseTill = settings.baseTillCents()
         val drop = grand - baseTill
@@ -246,8 +261,9 @@ class MainActivity : AppCompatActivity() {
             }
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         col.addView(label("Cash breakdown", 20, true, Color.WHITE).apply { setPadding(0, dp(22), 0, dp(8)) })
-        cashCounts.indices.filter { cashCounts[it] > 0 }.forEach {
-            col.addView(label("${cashLabels[it]} × ${cashCounts[it]} = ${money(cashCounts[it].toLong() * cashCents[it])}", 16, false, Color.WHITE))
+        cashCounts.indices.filter { cashCounts[it] > 0 || rollCounts[it] > 0 }.forEach {
+            if (cashCounts[it] > 0) col.addView(label("${cashLabels[it]} × ${cashCounts[it]} = ${money(cashCounts[it].toLong() * cashCents[it])}", 16, false, Color.WHITE))
+            if (rollCounts[it] > 0) col.addView(label("${cashLabels[it]} rolls × ${rollCounts[it]} (${rollSizes[it]} each) = ${money(rollCounts[it].toLong() * rollSizes[it] * cashCents[it])}", 16, false, Color.WHITE))
         }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(22), 0, dp(10)) }
         nav.addView(action("BACK") { stage = stages.size; cashIndex = cashLabels.lastIndex; render() }, weightedButton(10))
@@ -409,20 +425,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun commitCash() {
-        if (input.isNotBlank()) cashCounts[cashIndex] = input.toIntOrNull()?.coerceIn(0, 99999) ?: cashCounts[cashIndex]
+        if (input.isNotBlank()) {
+            val value = input.toIntOrNull()?.coerceIn(0, 99999) ?: return
+            if (editingRolls && rollSizes[cashIndex] > 0) rollCounts[cashIndex] = value else cashCounts[cashIndex] = value
+        }
     }
 
     private fun resetAll() {
         entries.forEach { it.clear() }
         cashCounts.fill(0)
-        stage = 0; cashIndex = 0; input = ""
+        rollCounts.fill(0)
+        stage = 0; cashIndex = 0; input = ""; editingRolls = false
     }
 
     override fun onSaveInstanceState(out: Bundle) {
         super.onSaveInstanceState(out)
         out.putInt("stage", stage); out.putInt("cashIndex", cashIndex); out.putString("input", input); out.putBoolean("splashDone", splashDone); out.putBoolean("settingsOpen", settingsOpen)
         entries.indices.forEach { out.putLongArray("entry$it", entries[it].toLongArray()) }
-        out.putIntArray("cashCounts", cashCounts)
+        out.putIntArray("cashCounts", cashCounts); out.putIntArray("rollCounts", rollCounts); out.putBoolean("editingRolls", editingRolls)
     }
 
     private fun restore(state: Bundle?) {
@@ -430,6 +450,8 @@ class MainActivity : AppCompatActivity() {
         stage = state.getInt("stage"); cashIndex = state.getInt("cashIndex"); input = state.getString("input", ""); splashDone = state.getBoolean("splashDone"); settingsOpen = state.getBoolean("settingsOpen")
         entries.indices.forEach { entries[it].addAll((state.getLongArray("entry$it") ?: longArrayOf()).toList()) }
         state.getIntArray("cashCounts")?.forEachIndexed { i, value -> if (i < cashCounts.size) cashCounts[i] = value }
+        state.getIntArray("rollCounts")?.forEachIndexed { i, value -> if (i < rollCounts.size) rollCounts[i] = value }
+        editingRolls = state.getBoolean("editingRolls")
     }
 
     private fun display(value: String) = label(value, 32, true, Color.WHITE).apply {
