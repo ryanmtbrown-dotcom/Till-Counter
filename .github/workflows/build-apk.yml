@@ -36,6 +36,8 @@ jobs:
         run: bash verify-project.sh
       - name: Build signed APK
         run: gradle --no-daemon :app:assembleDebug
+      - name: Compile Android 16 instrumentation proof
+        run: gradle --no-daemon :app:compileDebugAndroidTestKotlin
       - name: Inspect APK
         shell: bash
         run: |
