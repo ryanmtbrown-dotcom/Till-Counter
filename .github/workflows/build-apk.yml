@@ -36,7 +36,8 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" > apk-contents.txt
           grep -Fq 'classes.dex' apk-contents.txt
-          grep -Fq 'res/drawable_nodpi/splash.png' apk-contents.txt
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump resources "$APK" > apk-resources.txt
+          grep -Fq 'drawable/splash' apk-resources.txt
           "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > apk-signature.txt
           "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$APK" > apk-badging.txt
           grep -Fq "package: name='com.tillcounter.app'" apk-badging.txt
@@ -70,6 +71,7 @@ jobs:
             apk-contents.txt
             apk-signature.txt
             apk-badging.txt
+            apk-resources.txt
             start.txt
             device.log
             final-screen.png
