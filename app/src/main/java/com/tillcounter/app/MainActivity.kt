@@ -190,12 +190,13 @@ class MainActivity : AppCompatActivity() {
         col.addView(navButton("SAVE BASE TILL", true) {
             val cents = parseCents(base.text.toString()) ?: 0L
             settings.setBaseTillCents(cents)
+            hideKeyboard(base)
             Toast.makeText(this, "Base till saved: " + money(cents), Toast.LENGTH_SHORT).show()
         }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
         col.addView(label("APP", 13, true, Color.rgb(214, 183, 107)).apply { setPadding(0, dp(24), 0, dp(6)) })
         col.addView(label("Version " + appVersion(), 14, false, Color.rgb(169, 184, 176)))
         col.addView(navButton("CHECK FOR UPDATE", false) { checkForUpdate() }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(8) })
-        col.addView(navButton("DONE", true) { settingsOpen = false; input = ""; render() }, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(18) })
+        col.addView(navButton("DONE", true) { hideKeyboard(base); settingsOpen = false; input = ""; render() }, LinearLayout.LayoutParams(-1, dp(58)).apply { topMargin = dp(18) })
     }
 
     private fun commitPendingMoney(): Boolean {
@@ -270,6 +271,12 @@ class MainActivity : AppCompatActivity() {
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
         col.addView(nav, matchWrap())
         
+    }
+
+    private fun hideKeyboard(view: View) {
+        (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .hideSoftInputFromWindow(view.windowToken, 0)
+        view.clearFocus()
     }
 
     private fun appVersion(): String = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
