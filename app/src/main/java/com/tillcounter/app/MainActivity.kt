@@ -272,9 +272,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderSummary() {
         val categoryTotals = entries.map { it.sum() }
         val cashTotal = cashCounts.indices.sumOf { cashCounts[it].toLong() * cashCents[it] + rollCounts[it].toLong() * rollSizes[it] * cashCents[it] }
-        val grand = categoryTotals.filterIndexed { index, _ -> settings.isEnabled(stages[index]) }.sum() + cashTotal
+        val total = cashTotal
         val baseTill = settings.baseTillCents()
-        val drop = grand - baseTill
+        val drop = total - baseTill
         val outer = root()
         val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(10), dp(16), dp(10)) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -293,7 +293,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(18), dp(18), dp(18), dp(18))
             setBackgroundColor(Color.rgb(16, 42, 33))
             addView(label("TOTAL", 15, true, Color.rgb(214, 183, 107)))
-            addView(label(money(grand), 34, true, Color.WHITE))
+            addView(label(money(total), 34, true, Color.WHITE))
             if (baseTill > 0) {
                 addView(label("BASE TILL  " + money(baseTill), 14, true, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(10), 0, 0) })
                 addView(label(if (drop >= 0) "DROP  " + money(drop) else "LOAN NEEDED  " + money(-drop), 24, true, if (drop >= 0) Color.rgb(214, 183, 107) else Color.rgb(244, 170, 160)))
