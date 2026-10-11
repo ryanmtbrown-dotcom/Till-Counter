@@ -56,6 +56,21 @@ class CompleteWorkflowTest {
 
     private fun digits(vararg keys: String) = keys.forEach { tap(it) }
 
+    private fun hold(text: String) {
+        val bounds = waitText(text).visibleBounds
+        device.swipe(bounds.centerX(), bounds.centerY(), bounds.centerX(), bounds.centerY(), 140)
+        device.waitForIdle(2_000)
+        assertForeground()
+    }
+
+    private fun assertSummary(text: String) {
+        repeat(6) {
+            if (device.hasObject(By.text(text))) return
+            scrollDown()
+        }
+        throw AssertionError("Missing summary value after scrolling: $text")
+    }
+
     private fun scrollDown() {
         device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 0.8f)
         device.waitForIdle(1_000)
@@ -91,20 +106,39 @@ class CompleteWorkflowTest {
         digits("3",".","7","5"); tap("NEXT"); assertText("Loans")
         digits("4",".","0","0"); tap("NEXT: CASH"); assertText("\$100 bills")
 
-        // Every cash denomination receives nonzero data.
-        listOf("1","2","3","4","5","6","7").forEach { n -> tap(n); tap("NEXT"); assertText("Cash") }
+        // Short C clears pending input without touching the previously saved denomination.
+        tap("6"); tap("C"); assertText("Count: 0")
+        tap("6"); tap("NEXT"); assertText("\$50 bills")
+        tap("BACK"); assertText("\$100 bills"); assertText("Count: 6")
+        // Long C resets the accepted number, then the cashier can re-enter it normally.
+        hold("C"); assertText("Count: 0")
+        tap("1"); tap("NEXT"); assertText("\$50 bills")
+        listOf("2","3","4","5","6","7").forEach { n -> tap(n); tap("NEXT"); assertText("Cash") }
         listOf("\$1 coins","Half dollars","Quarters","Dimes","Nickels").forEach { label ->
-            assertText(label); tap("1"); tap("ROLLS: 0"); tap("1"); tap("NEXT"); assertText("Cash")
+            assertText(label); tap("1"); tap("ROLLS: 0"); tap("1")
+            if (label == "\$1 coins") {
+                hold("C")
+                assertText("ROLLS: 0"); assertText("LOOSE: 1")
+                tap("1")
+            }
+            tap("NEXT"); assertText("Cash")
         }
         assertText("Pennies")
         tap("9"); tap("C"); tap("1"); tap("3"); tap("⌫"); tap("2")
         tap("ROLLS: 0"); tap("1"); tap("FINISH"); assertText("Till Summary")
 
-        // TOTAL is deliberately cash-only: 398.52; base 300 => drop 98.52.
-        // Non-cash categories remain separately visible and excluded from TOTAL/drop.
-        if (!device.hasObject(By.text("\$398.52"))) scrollDown()
-        assertText("\$398.52"); assertText("BASE TILL  \$300.00"); assertText("DROP  \$98.52")
-        listOf("\$54.23","\$10.00","\$2.50","\$3.75","\$4.00").forEach { assertText(it) }
+        // Recommended physical drop matches the cash-only 398.52 minus base 300.00.
+        // The paper form displays the actual drop (98.52), not the counted-cash total.
+        assertSummary("RECOMMENDED CASH DROP")
+        listOf("\$100s","\$50s","\$20s","\$10s","\$5s","\$1s","\$2s","Coins").forEach {
+            assertSummary(it)
+        }
+        assertSummary("Cash"); assertSummary("\$98.52")
+        assertSummary("Checks"); assertSummary("\$3.75")
+        assertSummary("Vendor Coupon"); assertSummary("\$2.50")
+        assertSummary("Gift Certificates"); assertSummary("\$10.00")
+        assertSummary("Store Charges"); assertSummary("\$54.23")
+        assertSummary("Loans"); assertSummary("\$4.00")
 
         // Summary BACK preserves final denomination state.
         tap("BACK"); assertText("Pennies"); assertText("LOOSE: 12"); assertText("ROLLS: 1")

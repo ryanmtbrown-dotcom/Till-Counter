@@ -277,7 +277,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             col.addView(label("Count: $count", 24, true, Color.WHITE))
         }
-        col.addView(label("Value: " + money(totalValue), 17, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(4)) })
+        col.addView(label("Value: " + money(totalValue), 17, false, Color.rgb(169, 184, 176)).apply { setPadding(0, 0, 0, dp(2)) })
+        col.addView(label("Tap C to edit • Hold C to clear the saved count", 12, false, Color.rgb(214, 183, 107)).apply { setPadding(0, 0, 0, dp(3)) })
         val shownCount = if (editingRolls && isCoin) rolls else count
         col.addView(display(if (input.isBlank()) shownCount.toString() else input))
         countPad(col)
@@ -297,48 +298,85 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSummary() {
         val categoryTotals = entries.map { it.sum() }
-        val cashTotal = cashCounts.indices.sumOf { cashCounts[it].toLong() * cashCents[it] + rollCounts[it].toLong() * rollSizes[it] * cashCents[it] }
-        val total = cashTotal
-        val baseTill = settings.baseTillCents()
-        val drop = total - baseTill
+        val cashTotal = cashCounts.indices.sumOf {
+            cashCounts[it].toLong() * cashCents[it] + rollCounts[it].toLong() * rollSizes[it] * cashCents[it]
+        }
+        val requestedDrop = (cashTotal - settings.baseTillCents()).coerceAtLeast(0L)
+        val drop = DropPlanner.recommend(requestedDrop, cashCounts, rollCounts, rollSizes)
         val outer = root()
-        val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(10), dp(16), dp(10)) }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
         header.addView(label("TILL COUNTER", 15, true, Color.rgb(214, 183, 107)), LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(navButton("⚙", false) { openSettings() }.apply { contentDescription = "Settings"; textSize = 21f }, LinearLayout.LayoutParams(dp(54), dp(46)))
+        header.addView(navButton("⚙", false) { openSettings() }.apply {
+            contentDescription = "Settings"; textSize = 21f
+        }, LinearLayout.LayoutParams(dp(54), dp(46)))
         shell.addView(header, matchWrap())
         shell.addView(label("Till Summary", 27, true, Color.WHITE), matchWrap())
-        shell.addView(label("Copy these totals to your till form.", 14, false, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(2), 0, dp(6)) }, matchWrap())
-        val scroll = ScrollView(this).apply { isFillViewport = false }
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val date = java.text.SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US).format(java.util.Date())
+        shell.addView(label(date, 13, false, Color.rgb(169, 184, 176)).apply {
+            setPadding(0, dp(2), 0, dp(8))
+        }, matchWrap())
 
-        stages.forEachIndexed { index, name -> if (settings.isEnabled(name)) col.addView(summaryRow(name, categoryTotals[index])) }
-        col.addView(summaryRow("Cash", cashTotal))
-        col.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            setBackgroundColor(Color.rgb(16, 42, 33))
-            addView(label("TOTAL", 15, true, Color.rgb(214, 183, 107)))
-            addView(label(money(total), 34, true, Color.WHITE))
-            if (baseTill > 0) {
-                addView(label("BASE TILL  " + money(baseTill), 14, true, Color.rgb(169, 184, 176)).apply { setPadding(0, dp(10), 0, 0) })
-                addView(label(if (drop >= 0) "DROP  " + money(drop) else "LOAN NEEDED  " + money(-drop), 24, true, if (drop >= 0) Color.rgb(214, 183, 107) else Color.rgb(244, 170, 160)))
-            }
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
-        col.addView(label("Cash breakdown", 20, true, Color.WHITE).apply { setPadding(0, dp(22), 0, dp(8)) })
-        cashCounts.indices.filter { cashCounts[it] > 0 || rollCounts[it] > 0 }.forEach {
-            if (cashCounts[it] > 0) col.addView(label("${cashLabels[it]} × ${cashCounts[it]} = ${money(cashCounts[it].toLong() * cashCents[it])}", 16, false, Color.WHITE))
-            if (rollCounts[it] > 0) col.addView(label("${cashLabels[it]} rolls × ${rollCounts[it]} (${rollSizes[it]} each) = ${money(rollCounts[it].toLong() * rollSizes[it] * cashCents[it])}", 16, false, Color.WHITE))
+        val scroll = ScrollView(this).apply {
+            isFillViewport = false
+            isVerticalScrollBarEnabled = true
+            contentDescription = "Till form amounts"
         }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(1), 0, dp(14))
+        }
+        val dropCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(13), dp(14), dp(12))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.rgb(13, 36, 29))
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.rgb(80, 88, 66))
+            }
+        }
+        dropCard.addView(label("RECOMMENDED CASH DROP", 14, true, Color.rgb(214, 183, 107)).apply {
+            setPadding(0, 0, 0, dp(8))
+        })
+        // Calculation honors $2 notes before $1 notes; the form itself prints $1 before $2.
+        val formOrder = intArrayOf(0, 1, 2, 3, 4, 6, 5)
+        val formLabels = arrayOf("$100s", "$50s", "$20s", "$10s", "$5s", "$1s", "$2s")
+        formOrder.forEachIndexed { index, denomIndex ->
+            dropCard.addView(dropCountRow(formLabels[index], drop.counts[denomIndex]))
+        }
+        dropCard.addView(summaryRow("Coins", drop.coinCents()))
+        col.addView(dropCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(11) })
+
+        col.addView(summaryRow("Cash", drop.actualCents, primary = true))
+        if (!drop.exact) {
+            col.addView(label("Exact drop cannot be assembled from the counted denominations. Short by " +
+                money(drop.requestedCents - drop.actualCents) + ".", 13, false, Color.rgb(244, 170, 160)).apply {
+                setPadding(dp(12), dp(2), dp(12), dp(10))
+            })
+        }
+        col.addView(summaryRow("Checks", categoryTotals[3]))
+        col.addView(summaryRow("Vendor Coupon", categoryTotals[2]))
+        col.addView(summaryRow("Gift Certificates", categoryTotals[1]))
+        col.addView(summaryRow("Store Charges", categoryTotals[0]))
+        col.addView(summaryRow("Loans", categoryTotals[4]))
+
         scroll.addView(col, ViewGroup.LayoutParams(-1, -2))
         shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, 0) }
-        nav.addView(action("BACK") { stage = stages.size; cashIndex = cashLabels.lastIndex; render() }, weightedButton(10))
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, 0)
+        }
+        nav.addView(action("BACK") {
+            stage = stages.size; cashIndex = cashLabels.lastIndex; render()
+        }, weightedButton(10))
         nav.addView(action("NEW COUNT") { resetAll(); render() }, LinearLayout.LayoutParams(0, dp(58), 1f))
         shell.addView(nav, LinearLayout.LayoutParams(-1, dp(66)))
         outer.addView(shell, FrameLayout.LayoutParams(-1, -1))
         setContentView(outer)
-
     }
 
     private fun hideKeyboard(view: View) {
@@ -461,7 +499,22 @@ class MainActivity : AppCompatActivity() {
         listOf(listOf("7", "8", "9"), listOf("4", "5", "6"), listOf("1", "2", "3"), listOf("C", "0", "⌫")).forEach { keys ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             keys.forEach { key ->
-                row.addView(action(key) { countKey(key) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                val button = action(key) { countKey(key) }
+                if (key == "C") {
+                    button.contentDescription = "Clear current entry; hold to clear accepted count"
+                    button.setOnLongClickListener { view ->
+                        input = ""
+                        if (editingRolls && rollSizes[cashIndex] > 0) {
+                            rollCounts[cashIndex] = 0
+                        } else {
+                            cashCounts[cashIndex] = 0
+                        }
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        render()
+                        true
+                    }
+                }
+                row.addView(button, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
                     setMargins(dp(4), dp(2), dp(4), dp(2))
                 })
             }
@@ -549,10 +602,27 @@ class MainActivity : AppCompatActivity() {
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
     }
 
-    private fun summaryRow(name: String, cents: Long) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(11), dp(4), dp(11))
-        addView(label(name, 17, false, Color.WHITE), LinearLayout.LayoutParams(0, -2, 1f))
-        addView(label(money(cents), 18, true, Color.WHITE))
+    private fun dropCountRow(name: String, count: Int) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = dp(35)
+        addView(label(name, 16, false, Color.rgb(221, 230, 224)), LinearLayout.LayoutParams(0, -2, 1f))
+        addView(label(count.toString(), 19, true,
+            if (count > 0) Color.WHITE else Color.rgb(147, 164, 154)))
+    }
+
+    private fun summaryRow(name: String, cents: Long, primary: Boolean = false) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(13), dp(11), dp(13), dp(11))
+        if (primary) background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(Color.rgb(29, 54, 42))
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(1), Color.rgb(214, 183, 107))
+        }
+        addView(label(name, 17, primary, if (primary) Color.rgb(214, 183, 107) else Color.WHITE),
+            LinearLayout.LayoutParams(0, -2, 1f))
+        addView(label(money(cents), 19, true, Color.WHITE))
     }
 
     private fun action(name: String, click: () -> Unit) = Button(this).apply {

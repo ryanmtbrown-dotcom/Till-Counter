@@ -34,6 +34,8 @@ jobs:
           gradle-version: '8.13'
       - name: Verify clean project
         run: bash verify-project.sh
+      - name: Test cash drop recommendation logic
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build signed APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Compile Android 16 instrumentation proof
@@ -124,7 +126,7 @@ jobs:
           V="$(sed -n 's/^TILL_VERSION_NAME=//p' gradle.properties)"
           TAG="v$V"; APK="release-out/Till-Counter-v${V}.apk"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "Till Counter $TAG" --notes 'Clean native rebuild. Complete Android 16 functional workflow passed before publication.'
+          gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "Till Counter $TAG" --notes 'Form-ordered recommended cash drop and long-press Clear for accepted denomination counts. Published only after Android functional verification.'
           mkdir roundtrip
           gh release download "$TAG" --pattern "Till-Counter-v${V}.apk" --dir roundtrip
           cmp "$APK" "roundtrip/Till-Counter-v${V}.apk"

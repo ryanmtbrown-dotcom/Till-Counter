@@ -149,19 +149,18 @@ wait_text 'Pennies'; tap_text '9'; tap_text 'C'; tap_text '1'; tap_text '3'; tap
 tap_text 'ROLLS: 0'; tap_text '1'; tap_text 'FINISH'; wait_text 'Till Summary'
 echo 'PHASE_SUMMARY_PASS'
 
-# Expected money stages = 54.23 + 10 + 2.50 + 3.75 + 4 = 74.48.
-# Expected cash = 100 +100 +60 +40 +25 +12 +7 +26 +10.50 +10.25 +5.10 +2.05 +0.62 = 398.52.
-# TOTAL is deliberately cash-only: 398.52; base = 300.00; drop = 98.52.
-# Non-cash stages remain separately visible and must not enter TOTAL/drop.
-assert_text '$398.52'
-assert_text 'BASE TILL  $300.00'
-assert_text 'DROP  $98.52'
-assert_text '$54.23'
-assert_text '$10.00'
-assert_text '$2.50'
-assert_text '$3.75'
-assert_text '$4.00'
-for name in 'Store Charges' 'Gift Certificates' 'Vendor Coupons' 'Checks' 'Loans' 'Cash'; do assert_text "$name"; done
+# The amount recommended for Cash is the physical cash-only drop: 398.52 - 300.00 = 98.52.
+# The requested form order starts with bills, then coin total, Cash and the noncash categories.
+tap_text 'RECOMMENDED CASH DROP'
+for name in '$100s' '$50s' '$20s' '$10s' '$5s' '$1s' '$2s' 'Coins'; do
+  tap_text "$name"
+done
+tap_text 'Cash'; assert_text '$98.52'
+tap_text 'Checks'; assert_text '$3.75'
+tap_text 'Vendor Coupon'; assert_text '$2.50'
+tap_text 'Gift Certificates'; assert_text '$10.00'
+tap_text 'Store Charges'; assert_text '$54.23'
+tap_text 'Loans'; assert_text '$4.00'
 
 # Summary BACK returns to final cash denomination with values intact.
 tap_text 'BACK'; wait_text 'Pennies'; assert_text 'LOOSE: 12'; assert_text 'ROLLS: 1'
