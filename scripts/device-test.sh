@@ -26,7 +26,7 @@ PY
 }
 tap_text(){
   local needle="$1"
-  for attempt in $(seq 1 4); do
+  for attempt in $(seq 1 9); do
     dump
     if python3 - "$needle" <<'PY'
 import re,sys,subprocess,xml.etree.ElementTree as ET
@@ -67,15 +67,19 @@ PY
     fi
     # Only Settings/Summary are allowed to scroll. Counting screens intentionally
     # expose every control in the fixed viewport, so absence there is a failure.
-    if ! python3 <<'PY'
-import re,subprocess,xml.etree.ElementTree as ET
+    if ! python3 - "$attempt" <<'PY'
+import re,sys,subprocess,xml.etree.ElementTree as ET
+attempt=int(sys.argv[1])
 root=ET.parse('ui.xml').getroot()
 for n in root.iter('node'):
     if n.attrib.get('class')=='android.widget.ScrollView':
         m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib['bounds'])
-        x=(int(m[1])+int(m[3]))//2
-        top=int(m[2]); bottom=int(m[4])
-        y1=top+int((bottom-top)*0.72); y2=top+int((bottom-top)*0.32)
+        if not m: continue
+        x1,top,x2,bottom=map(int,m.groups())
+        x=(x1+x2)//2
+        # Search down first, then upward; this also handles views opened mid-scroll.
+        start,end=(0.72,0.32) if attempt <= 4 else (0.32,0.72)
+        y1=top+int((bottom-top)*start); y2=top+int((bottom-top)*end)
         subprocess.check_call(['adb','shell','input','swipe',str(x),str(y1),str(x),str(y2),'250'])
         raise SystemExit(0)
 raise SystemExit(1)
@@ -92,6 +96,70 @@ PY
   exit 1
 }
 assert_text(){ dump; grep -Fq "text=\"$1\"" ui.xml || { echo "missing text: $1"; cat ui.xml; exit 1; }; }
+# A summary may open with its scroll position restored near the bottom.
+# Reset to the top before checking fields in paper-form order.
+summary_to_top(){
+  for _ in 1 2 3 4; do
+    dump
+    python3 <<'PY'
+import re,subprocess,xml.etree.ElementTree as ET
+root=ET.parse('ui.xml').getroot()
+for node in root.iter('node'):
+    if node.attrib.get('class')!='android.widget.ScrollView': continue
+    match=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',node.attrib['bounds'])
+    if not match: continue
+    x1,top,x2,bottom=map(int,match.groups())
+    x=(x1+x2)//2
+    height=bottom-top
+    subprocess.check_call(['adb','shell','input','swipe',str(x),str(top+height//3),str(x),str(top+height*4//5),'250'])
+    raise SystemExit(0)
+raise SystemExit('Summary ScrollView not found')
+PY
+  done
+}
+
+# Verify paired values within the same visible Android row, not merely somewhere
+# on the page. Passive labels are read, never tapped.
+assert_form_row(){
+  local name="$1" expected="$2"
+  for attempt in 1 2 3 4 5 6; do
+    dump
+    if python3 - "$name" "$expected" <<'PY'
+import sys,xml.etree.ElementTree as ET
+name,expected=sys.argv[1:]
+root=ET.parse('ui.xml').getroot()
+for node in root.iter('node'):
+    if node.attrib.get('class')!='android.widget.LinearLayout': continue
+    children=list(node)
+    if len(children)!=2: continue
+    if children[0].attrib.get('text')==name and children[1].attrib.get('text')==expected:
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+    then
+      return 0
+    fi
+    if ! python3 <<'PY'
+import re,subprocess,xml.etree.ElementTree as ET
+root=ET.parse('ui.xml').getroot()
+for node in root.iter('node'):
+    if node.attrib.get('class')!='android.widget.ScrollView': continue
+    match=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',node.attrib['bounds'])
+    if not match: continue
+    x1,top,x2,bottom=map(int,match.groups())
+    x=(x1+x2)//2
+    height=bottom-top
+    subprocess.check_call(['adb','shell','input','swipe',str(x),str(top+height*4//5),str(x),str(top+height//3),'250'])
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+    then break; fi
+  done
+  echo "Missing summary row: $name = $expected"
+  cat ui.xml
+  exit 1
+}
+
 wait_text(){
   for i in $(seq 1 20); do
     dump
@@ -149,18 +217,24 @@ wait_text 'Pennies'; tap_text '9'; tap_text 'C'; tap_text '1'; tap_text '3'; tap
 tap_text 'ROLLS: 0'; tap_text '1'; tap_text 'FINISH'; wait_text 'Till Summary'
 echo 'PHASE_SUMMARY_PASS'
 
-# The amount recommended for Cash is the physical cash-only drop: 398.52 - 300.00 = 98.52.
-# The requested form order starts with bills, then coin total, Cash and the noncash categories.
-tap_text 'RECOMMENDED CASH DROP'
-for name in '$100s' '$50s' '$20s' '$10s' '$5s' '$1s' '$2s' 'Coins'; do
-  tap_text "$name"
-done
-tap_text 'Cash'; assert_text '$98.52'
-tap_text 'Checks'; assert_text '$3.75'
-tap_text 'Vendor Coupon'; assert_text '$2.50'
-tap_text 'Gift Certificates'; assert_text '$10.00'
-tap_text 'Store Charges'; assert_text '$54.23'
-tap_text 'Loans'; assert_text '$4.00'
+# Verify every field in the printed form order and its matching amount.
+# The cash-only drop is 398.52 - 300.00 = 98.52.
+summary_to_top
+assert_text 'RECOMMENDED CASH DROP'
+assert_form_row '$100s' '0'
+assert_form_row '$50s' '1'
+assert_form_row '$20s' '2'
+assert_form_row '$10s' '0'
+assert_form_row '$5s' '1'
+assert_form_row '$1s' '1'
+assert_form_row '$2s' '1'
+assert_form_row 'Coins' '$0.52'
+assert_form_row 'Cash' '$98.52'
+assert_form_row 'Checks' '$3.75'
+assert_form_row 'Vendor Coupon' '$2.50'
+assert_form_row 'Gift Certificates' '$10.00'
+assert_form_row 'Store Charges' '$54.23'
+assert_form_row 'Loans' '$4.00'
 
 # Summary BACK returns to final cash denomination with values intact.
 tap_text 'BACK'; wait_text 'Pennies'; assert_text 'LOOSE: 12'; assert_text 'ROLLS: 1'

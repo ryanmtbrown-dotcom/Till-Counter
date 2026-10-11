@@ -76,6 +76,15 @@ class CompleteWorkflowTest {
         device.waitForIdle(1_000)
     }
 
+    private fun summaryToTop() {
+        repeat(4) {
+            val scroll = device.findObject(By.scrollable(true))
+                ?: throw AssertionError("Summary scroll area missing")
+            scroll.scroll(Direction.UP, 0.8f)
+        }
+        device.waitForIdle(2_000)
+    }
+
     @Test fun completeWorkflowAndroid16() {
         // Settings and persistent base till.
         tapDesc("Settings"); assertText("SETTINGS")
@@ -129,6 +138,7 @@ class CompleteWorkflowTest {
 
         // Recommended physical drop matches the cash-only 398.52 minus base 300.00.
         // The paper form displays the actual drop (98.52), not the counted-cash total.
+        summaryToTop()
         assertSummary("RECOMMENDED CASH DROP")
         listOf("\$100s","\$50s","\$20s","\$10s","\$5s","\$1s","\$2s","Coins").forEach {
             assertSummary(it)
