@@ -1,4 +1,4 @@
-name: Audit retained Actions builds (no deletions)
+name: Prune old Actions artifacts - preserve verified build
 
 on:
   push:
@@ -9,56 +9,51 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
-  audit:
+  cleanup:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Inventory artifacts and identify latest successful build
+      - name: Preserve latest verified build and remove older stored artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .name, .size_in_bytes, .created_at, (.workflow_run.id // 0)] | @tsv' > "$RUNNER_TEMP/inventory.tsv"
-          python3 - "$RUNNER_TEMP/inventory.tsv" <<'PY'
-          import collections, json, os, subprocess, sys
-          rows = []
-          for line in open(sys.argv[1], encoding="utf-8"):
-              data = line.rstrip("\n").split("\t")
-              if len(data) != 5:
-                  raise SystemExit(f"Unexpected artifact inventory row: {data!r}")
-              ident, name, size, created, run_id = data
-              rows.append((int(ident), name, int(size), created, int(run_id)))
-          rows.sort(key=lambda x: (x[3], x[0]), reverse=True)
-          repo = os.environ["GITHUB_REPOSITORY"]
-          inspected = {}
-          keep_run = None
-          for _, name, _, created, run_id in rows:
-              if not run_id:
-                  continue
-              if run_id not in inspected:
-                  cmd = subprocess.run(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"], capture_output=True, text=True)
-                  if cmd.returncode:
-                      raise SystemExit(f"SAFETY STOP: cannot verify workflow run {run_id}: {cmd.stderr[-250:]}")
-                  run = json.loads(cmd.stdout)
-                  inspected[run_id] = run.get("conclusion")
-              if inspected[run_id] == "success":
-                  keep_run = run_id
-                  break
-          kept = [r for r in rows if keep_run is not None and r[4] == keep_run]
-          delete = [r for r in rows if r not in kept]
-          def mb(rows): return round(sum(r[2] for r in rows)/1e6, 2)
-          print(f"INVENTORY: repo={repo}, total={len(rows)}, total_MB={mb(rows)}",flush=True)
-          print(f"KEEP: workflow_run={keep_run}, count={len(kept)}, MB={mb(kept)}",flush=True)
-          for r in kept:
-              print(f"KEEP_ITEM: id={r[0]}, name={r[1]}, MB={r[2]/1e6:.2f}, created={r[3]}",flush=True)
-          print(f"DELETE_CANDIDATES: count={len(delete)}, MB={mb(delete)}",flush=True)
-          for name, data in collections.Counter({x[1]:sum(y[2] for y in delete if y[1] == x[1]) for x in delete}).most_common(12):
-              print(f"DELETE_GROUP: name={name}, count={sum(z[1]==name for z in delete)}, MB={data/1e6:.2f}",flush=True)
-          if rows and not kept:
-              raise SystemExit("SAFETY STOP: no artifact associated with a verified successful workflow run")
-          print("READ_ONLY_AUDIT_COMPLETE",flush=True)
+          REPO="$GITHUB_REPOSITORY"
+          EXPECTED_MAIN_SHA="939c47719d82f258ee49b3cf419e576c0b418525"
+          KEEP_ID="11688748571"
+          KEEP_RUN="38103659822"
+          KEEP_NAME="till-counter-proof"
+          MAIN_SHA="$(gh api "repos/$REPO/branches/main" --jq '.commit.sha')"
+          test "$MAIN_SHA" = "$EXPECTED_MAIN_SHA" || { echo "SAFETY STOP: main changed"; exit 1; }
+          gh api "repos/$REPO/actions/runs/$KEEP_RUN" --jq '[.conclusion,.head_sha,.head_branch] | @tsv' > "$RUNNER_TEMP/run.tsv"
+          test "$(cat "$RUNNER_TEMP/run.tsv")" = "$(printf 'success\t%s\tmain' "$EXPECTED_MAIN_SHA")" || { echo "SAFETY STOP: retained run is not successful current main"; exit 1; }
+          test "$(gh api "repos/$REPO/actions/artifacts/$KEEP_ID" --jq '.name')" = "$KEEP_NAME" || { echo "SAFETY STOP: retained artifact missing or wrong name"; exit 1; }
+          gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id,.name,.size_in_bytes] | @tsv' > "$RUNNER_TEMP/inventory.tsv"
+          python3 - "$RUNNER_TEMP/inventory.tsv" "$KEEP_ID" <<'PY'
+          import os, subprocess, sys
+          rows=[]
+          for raw in open(sys.argv[1],encoding="utf-8"):
+              parts=raw.rstrip("\n").split("\t")
+              if len(parts)!=3: raise SystemExit("SAFETY STOP: unexpected inventory row")
+              ident,name,size=parts
+              rows.append((int(ident),name,int(size)))
+          keep=int(sys.argv[2])
+          if len(rows)!=3 or sum(x[0]==keep for x in rows)!=1:
+              raise SystemExit(f"SAFETY STOP: inventory changed, found {len(rows)} artifacts")
+          older=[x for x in rows if x[0]!=keep]
+          print(f"BEFORE: count={len(rows)}, MB={sum(x[2] for x in rows)/1e6:.2f}",flush=True)
+          success=[]
+          for ident,name,size in older:
+              cmd=subprocess.run(["gh","api","--method","DELETE",f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{ident}"],capture_output=True,text=True)
+              if cmd.returncode: raise SystemExit(f"FAILED DELETE id={ident} name={name}: {cmd.stderr[-400:]}")
+              success.append((ident,name,size))
+          print(f"DELETED: count={len(success)}, MB={sum(x[2] for x in success)/1e6:.2f}",flush=True)
+          remaining=subprocess.run(["gh","api","--paginate",f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts?per_page=100","--jq",".artifacts[] | [.id,.name,.size_in_bytes] | @tsv"],capture_output=True,text=True,check=True).stdout.splitlines()
+          if len(remaining)!=1 or int(remaining[0].split("\t")[0])!=keep:
+              raise SystemExit(f"SAFETY STOP: verification mismatch {remaining}")
+          print(f"VERIFIED: remaining_artifacts=1, retained_id={keep}, artifact={remaining[0]}",flush=True)
           PY
