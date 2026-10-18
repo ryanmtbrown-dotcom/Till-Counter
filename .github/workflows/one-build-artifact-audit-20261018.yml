@@ -1,0 +1,64 @@
+name: Audit retained Actions builds (no deletions)
+
+on:
+  push:
+    branches:
+      - maintenance/actions-one-build-20261018
+    paths:
+      - .github/workflows/one-build-artifact-audit-20261018.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inventory artifacts and identify latest successful build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .name, .size_in_bytes, .created_at, (.workflow_run.id // 0)] | @tsv' > "$RUNNER_TEMP/inventory.tsv"
+          python3 - "$RUNNER_TEMP/inventory.tsv" <<'PY'
+          import collections, json, os, subprocess, sys
+          rows = []
+          for line in open(sys.argv[1], encoding="utf-8"):
+              data = line.rstrip("\n").split("\t")
+              if len(data) != 5:
+                  raise SystemExit(f"Unexpected artifact inventory row: {data!r}")
+              ident, name, size, created, run_id = data
+              rows.append((int(ident), name, int(size), created, int(run_id)))
+          rows.sort(key=lambda x: (x[3], x[0]), reverse=True)
+          repo = os.environ["GITHUB_REPOSITORY"]
+          inspected = {}
+          keep_run = None
+          for _, name, _, created, run_id in rows:
+              if not run_id:
+                  continue
+              if run_id not in inspected:
+                  cmd = subprocess.run(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"], capture_output=True, text=True)
+                  if cmd.returncode:
+                      raise SystemExit(f"SAFETY STOP: cannot verify workflow run {run_id}: {cmd.stderr[-250:]}")
+                  run = json.loads(cmd.stdout)
+                  inspected[run_id] = run.get("conclusion")
+              if inspected[run_id] == "success":
+                  keep_run = run_id
+                  break
+          kept = [r for r in rows if keep_run is not None and r[4] == keep_run]
+          delete = [r for r in rows if r not in kept]
+          def mb(rows): return round(sum(r[2] for r in rows)/1e6, 2)
+          print(f"INVENTORY: repo={repo}, total={len(rows)}, total_MB={mb(rows)}",flush=True)
+          print(f"KEEP: workflow_run={keep_run}, count={len(kept)}, MB={mb(kept)}",flush=True)
+          for r in kept:
+              print(f"KEEP_ITEM: id={r[0]}, name={r[1]}, MB={r[2]/1e6:.2f}, created={r[3]}",flush=True)
+          print(f"DELETE_CANDIDATES: count={len(delete)}, MB={mb(delete)}",flush=True)
+          for name, data in collections.Counter({x[1]:sum(y[2] for y in delete if y[1] == x[1]) for x in delete}).most_common(12):
+              print(f"DELETE_GROUP: name={name}, count={sum(z[1]==name for z in delete)}, MB={data/1e6:.2f}",flush=True)
+          if rows and not kept:
+              raise SystemExit("SAFETY STOP: no artifact associated with a verified successful workflow run")
+          print("READ_ONLY_AUDIT_COMPLETE",flush=True)
+          PY
