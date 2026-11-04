@@ -1,10 +1,11 @@
 name: Build and Prove Till Counter APK
+# Manual Actions budget control.
 on:
-  push:
-    branches: [main, premium-calculator-ui]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: till-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
