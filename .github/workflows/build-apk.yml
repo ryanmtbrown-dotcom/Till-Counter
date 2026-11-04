@@ -1,9 +1,6 @@
 name: Build and Prove Till Counter APK
+# Cost guard: no automatic builds on pushes or PRs.
 on:
-  push:
-    branches: [main, premium-calculator-ui]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       android16_only:
@@ -11,6 +8,9 @@ on:
         required: false
         default: false
         type: boolean
+concurrency:
+  group: till-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
