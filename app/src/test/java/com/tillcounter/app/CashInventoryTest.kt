@@ -23,7 +23,7 @@ class CashInventoryTest {
         val rollSizes = intArrayOf(0,0,0,0,0,0,0,25,20,40,50,40,50)
         val expanded = CashInventory.expandedCounts(loose, straps, bundles)
         val result = DropPlanner.recommend(10025L, expanded, rolls, rollSizes)
-        assertEquals(10525L, result.actualCents)
+        assertEquals(10025L, result.actualCents)
         assertEquals(1, result.counts[0])
         assertEquals(25, result.counts[12])
     }
