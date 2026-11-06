@@ -106,6 +106,8 @@ class CompleteWorkflowTest {
         assertTrue("NEXT pushed off-screen by amount history", device.hasObject(By.text("NEXT")))
         repeat(5) { tap("Remove") }
         digits("1",".","0","0"); tap("+"); assertText("\$1.00"); tap("Remove"); assertText("\$0.00")
+        tap("−"); digits("2",".","5","0"); assertText("-\$2.50")
+        tap("+"); assertText("-\$2.50"); tap("Remove"); assertText("\$0.00")
         digits("5","4",".","2","4"); tap("⌫"); tap("3"); assertText("\$54.23")
         tap("NEXT"); assertText("Gift Certificates")
         digits("1","0",".","0","0"); tap("NEXT"); assertText("Vendor Coupons")
@@ -114,6 +116,14 @@ class CompleteWorkflowTest {
         digits("2",".","5","0"); tap("NEXT"); assertText("Checks")
         digits("3",".","7","5"); tap("NEXT"); assertText("Loans")
         digits("4",".","0","0"); tap("NEXT: CASH"); assertText("\$100 bills")
+
+        // Bill mode totals must not confuse straps or bundles with loose pieces.
+        assertText("ENTER \$100 BILLS • LOOSE BILLS")
+        tap("STRAPS: 0"); tap("1"); tap("LOOSE: 0"); assertText("Value: \$10,000.00")
+        tap("STRAPS: 1"); hold("C"); assertText("STRAPS: 0")
+        tap("BUNDLES: 0"); tap("1"); tap("LOOSE: 0"); assertText("Value: \$100,000.00")
+        tap("BUNDLES: 1"); hold("C"); assertText("BUNDLES: 0")
+        tap("LOOSE: 0")
 
         // Short C clears pending input without touching the previously saved denomination.
         tap("6"); tap("C"); assertText("Count: 0")
