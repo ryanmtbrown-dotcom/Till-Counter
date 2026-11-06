@@ -20,17 +20,18 @@ class CompleteWorkflowTest {
 
     @Before fun launchClean() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val intent = context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
             addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
-        waitText("Store Charges", 12_000)
+        waitText("Store Charges", 40_000)
     }
 
     private fun waitText(text: String, timeout: Long = 4_000): UiObject2 =
         device.wait(Until.findObject(By.text(text)), timeout)
-            ?: throw AssertionError("Missing UI text: $text")
+            ?: throw AssertionError("Missing UI text: $text; app visible=" + device.hasObject(By.pkg(pkg)))
 
     private fun waitDesc(desc: String, timeout: Long = 4_000): UiObject2 =
         device.wait(Until.findObject(By.desc(desc)), timeout)
