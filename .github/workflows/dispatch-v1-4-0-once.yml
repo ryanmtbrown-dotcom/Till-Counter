@@ -1,0 +1,27 @@
+name: Dispatch Till Counter v1.4.0 Release Once
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dispatch-v1-4-0-once.yml'
+permissions:
+  actions: write
+  contents: read
+jobs:
+  request-release:
+    if: github.repository == 'ryanmtbrown-dotcom/Till-Counter'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Request one verified signed APK publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ryanmtbrown-dotcom/Till-Counter
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GH_REPO}/actions/workflows/build-apk.yml/dispatches" \
+            -f ref=main \
+            -f 'inputs[android16_only]=false' \
+            -f 'inputs[publish_release]=true' \
+            -f 'inputs[confirm_version]=1.4.0'
+          echo 'TILL_V1_4_0_RELEASE_DISPATCH_REQUESTED'
