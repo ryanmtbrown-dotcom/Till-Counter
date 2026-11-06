@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val list = entries[stage]
-        val col = baseColumn(stages[stage], "Enter an amount. Tap + for another, or NEXT when finished.")
+        val col = baseColumn(stages[stage], "Enter an amount. Tap − to change its sign; + to add another.")
         val history = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(11, 34, 27))
@@ -516,7 +516,8 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     val button = when {
                         isPlus -> plusButton { commitPendingMoney(); render() }
-                        key == "C" || key == "⌫" || key == "−" -> editKey(key) { moneyKey(key) }
+                        key == "−" -> editKey(key) { moneyKey(key) }.apply { contentDescription = "Toggle negative or positive amount" }
+                        key == "C" || key == "⌫" -> editKey(key) { moneyKey(key) }
                         else -> numberKey(key) { moneyKey(key) }
                     }
                     row.addView(button, keyParams())
