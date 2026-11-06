@@ -21,11 +21,10 @@ class CompleteWorkflowTest {
     @Before fun launchClean() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         device.wakeUp()
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val intent = context.packageManager.getLaunchIntentForPackage(pkg)!!.apply {
-            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
+        // Android 16 blocks background-context Activity launches intermittently.
+        // UI Automator's privileged shell launch matches the verified Android 7 path.
+        device.executeShellCommand("wm dismiss-keyguard")
+        device.executeShellCommand("am start -W -n $pkg/.MainActivity")
         waitText("Store Charges", 40_000)
     }
 
