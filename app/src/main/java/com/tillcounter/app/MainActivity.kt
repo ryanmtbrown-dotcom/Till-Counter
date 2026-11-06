@@ -278,12 +278,12 @@ class MainActivity : AppCompatActivity() {
         val totalValue = (noteCount + rolls.toLong() * rollSizes[cashIndex]) * cashCents[cashIndex]
         if (isBill) {
             val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(2), 0, dp(2)) }
-            modes.addView(navButton("LOOSE: $count", editingBillMode == 0) { commitCash(); editingBillMode = 0; input = ""; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            modes.addView(navButton("STRAPS: " + strapCounts[cashIndex], editingBillMode == 1) { commitCash(); editingBillMode = 1; input = ""; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            modes.addView(navButton("BUNDLES: " + bundleCounts[cashIndex], editingBillMode == 2) { commitCash(); editingBillMode = 2; input = ""; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            modes.addView(navButton("LOOSE: $count", editingBillMode == 0) { commitCash(); editingBillMode = 0; input = ""; render() }.apply { textSize = 12f; setPadding(dp(2), 0, dp(2), 0) }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            modes.addView(navButton("STRAPS: " + strapCounts[cashIndex], editingBillMode == 1) { commitCash(); editingBillMode = 1; input = ""; render() }.apply { textSize = 12f; setPadding(dp(2), 0, dp(2), 0) }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            modes.addView(navButton("BUNDLES: " + bundleCounts[cashIndex], editingBillMode == 2) { commitCash(); editingBillMode = 2; input = ""; render() }.apply { textSize = 12f; setPadding(dp(2), 0, dp(2), 0) }, LinearLayout.LayoutParams(0, dp(48), 1f))
             col.addView(modes, matchWrap())
             col.addView(label("1 strap = 100 bills • 1 bundle = 1,000 bills", 12, false, Color.rgb(169, 184, 176)))
-            col.addView(label("Count: $count", 17, true, Color.WHITE))
+            col.addView(label(if (editingBillMode == 0) "Count: $count" else "Loose bills: $count", 17, true, Color.WHITE))
         } else if (isCoin) {
             val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(2), 0, dp(2)) }
             modes.addView(navButton("LOOSE: " + count, !editingRolls) { commitCash(); editingRolls = false; input = ""; render() }, weightedButton(8))
